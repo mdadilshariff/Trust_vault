@@ -69,17 +69,25 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Upload Document</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Files are stored privately and never publicly accessible.</p>
+    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
+      <div className="pb-3 border-b border-slate-200/60">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Upload Document</h1>
+        <p className="text-slate-500 text-sm mt-1">
+          Files are validated with magic signature detection and stored in zero-leak private storage.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Drop zone */}
         <div
-          className={`rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
-            drag ? 'border-accent bg-accent/5' : errors.file ? 'border-red-400' : 'border-slate-200 hover:border-accent/50'
+          className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 cursor-pointer ${
+            drag
+              ? 'border-accent bg-accent/5 scale-[1.01] shadow-lg shadow-accent/10'
+              : file
+              ? 'border-emerald-300 bg-emerald-50/20'
+              : errors.file
+              ? 'border-red-400 bg-red-50/20'
+              : 'border-slate-200 hover:border-accent hover:bg-slate-50/50 hover:shadow-sm'
           }`}
           onDragOver={e => { e.preventDefault(); setDrag(true) }}
           onDragLeave={() => setDrag(false)}
@@ -93,70 +101,82 @@ export default function UploadPage() {
             onChange={e => pickFile(e.target.files?.[0] ?? null)}
           />
           {file ? (
-            <div className="flex items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-accent" />
+            <div className="flex items-center gap-4 p-2 bg-white rounded-xl shadow-xs border border-emerald-200">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100/70 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-6 h-6" />
               </div>
-              <div className="text-left">
-                <p className="font-medium text-slate-700">{file.name}</p>
-                <p className="text-sm text-slate-400">{formatBytes(file.size)}</p>
+              <div className="text-left flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-slate-800 text-sm truncate">{file.name}</p>
+                  <span className="badge-green text-[11px] font-mono uppercase">
+                    <Check className="w-3 h-3 text-emerald-600" /> Ready
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{formatBytes(file.size)} • Click to replace</p>
               </div>
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); setFile(null) }}
-                className="ml-auto p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                title="Remove file"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <>
-              <Upload className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-600 font-medium">Drop a file here, or click to browse</p>
-              <p className="text-slate-400 text-sm mt-1">PDF, DOCX, XLSX, PNG, JPG, ZIP, TXT, CSV and more · max {MAX_MB} MB</p>
-              {errors.file && <p className="text-red-500 text-sm mt-2">{errors.file}</p>}
-            </>
+            <div className="py-4">
+              <div className="w-14 h-14 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto mb-3 shadow-xs">
+                <Upload className="w-7 h-7" />
+              </div>
+              <p className="text-slate-800 font-semibold text-sm">Drag and drop file here, or click to browse</p>
+              <p className="text-slate-400 text-xs mt-1.5 max-w-sm mx-auto">
+                PDF, DOCX, XLSX, PPTX, PNG, JPG, ZIP, CSV, MD · up to {MAX_MB} MB
+              </p>
+              {errors.file && <p className="text-red-500 text-xs font-medium mt-3">{errors.file}</p>}
+            </div>
           )}
         </div>
 
         {/* Metadata */}
         <div className="card space-y-4">
           <div>
-            <label className="label">Title <span className="text-red-500">*</span></label>
+            <label className="label">
+              Document Title <span className="text-red-500">*</span>
+            </label>
             <input
               className={`input ${errors.title ? 'input-error' : ''}`}
               value={form.title}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="Document title"
+              placeholder="e.g. Q4 Financial Audit Report"
             />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
           <div>
-            <label className="label">Description</label>
+            <label className="label">Description (Optional)</label>
             <textarea
-              className="input min-h-[80px] resize-none"
+              className="input min-h-[85px] resize-none"
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Optional description…"
+              placeholder="Provide context or summary for collaborators…"
             />
           </div>
           <div>
             <label className="label">Category</label>
             <select
-              className="input"
+              className="input capitalize"
               value={form.category}
               onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
             >
-              <option value="">None</option>
+              <option value="">Select category (optional)</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 pt-2">
           <button type="submit" disabled={uploading} className="btn-primary flex-1 justify-center py-2.5">
             {uploading
-              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uploading…</>
+              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Storing Encrypted File…</>
               : <><Upload className="w-4 h-4" /> Upload Document</>}
           </button>
           <button type="button" onClick={() => navigate('/documents')} className="btn-secondary">
