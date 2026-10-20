@@ -37,6 +37,7 @@ frontend/.vite/
 # Storage (private uploads - never commit real files)
 storage/uploads/*
 !storage/uploads/.gitkeep
+backend/storage/
 
 # Secrets / keys
 *.pem
