@@ -3,8 +3,11 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
+# pyrefly: ignore[missing-import]
 from fastapi import Depends, HTTPException, Request, status
+# pyrefly: ignore[missing-import]
 from sqlalchemy import select
+# pyrefly: ignore[missing-import]
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db

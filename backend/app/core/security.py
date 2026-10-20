@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+# pyrefly: ignore[missing-import]
 from argon2 import PasswordHasher
+# pyrefly: ignore[missing-import]
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 _ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
