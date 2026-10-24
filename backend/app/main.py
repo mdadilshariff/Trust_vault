@@ -39,15 +39,16 @@ app.add_middleware(
     session_cookie=settings.session_cookie_name,
     max_age=settings.session_max_age_seconds,
     https_only=settings.is_production,
-    same_site="lax",
+    same_site="none" if settings.is_production else "lax",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept", "X-Requested-With"],
+    allow_headers=["Content-Type", "Accept", "X-Requested-With", "Authorization"],
 )
 
 # ── Routers ────────────────────────────────────────────────────────────────────
