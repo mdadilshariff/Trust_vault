@@ -1,12 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Shield, LayoutDashboard, FileText, Upload, Users,
-  Share2, ClipboardList, Settings, LogOut, Activity,
-  CheckSquare,
+  Share2, ClipboardList, LogOut, Activity, CheckSquare,
+  Terminal, Lock
 } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api'
-import toast from 'react-hot-toast'
 
 export default function Sidebar() {
   const { user, setUser } = useAuthStore()
@@ -23,111 +22,145 @@ export default function Sidebar() {
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/documents', icon: FileText, label: 'My Documents' },
+    { to: '/documents', icon: FileText, label: 'Documents' },
     { to: '/upload', icon: Upload, label: 'Upload' },
-    { to: '/shared', icon: Share2, label: 'Shared With Me' },
-    { to: '/audit/my', icon: ClipboardList, label: 'My Activity' },
+    { to: '/shared', icon: Share2, label: 'Shared with Me' },
+    { to: '/audit/my', icon: ClipboardList, label: 'Activity Log' },
   ]
 
   const adminItems = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Admin Dashboard' },
-    { to: '/admin/users', icon: Users, label: 'User Management' },
-    { to: '/admin/audit', icon: Activity, label: 'Audit Log' },
-    { to: '/admin/integrity', icon: CheckSquare, label: 'Integrity Check' },
+    { to: '/admin', icon: LayoutDashboard, label: 'Overview' },
+    { to: '/admin/users', icon: Users, label: 'Users' },
+    { to: '/admin/audit', icon: Activity, label: 'All Activity' },
+    { to: '/admin/integrity', icon: CheckSquare, label: 'Security Check' },
   ]
 
   return (
-    <aside className="w-64 h-screen bg-navy-950 flex flex-col fixed left-0 top-0 z-40">
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-navy-800">
+    <aside className="w-64 h-screen bg-zinc-950 border-r border-zinc-800/80 flex flex-col fixed left-0 top-0 z-40 select-none">
+      {/* Brand Header */}
+      <div className="px-5 py-4 border-b border-zinc-800 bg-zinc-950">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center shadow-lg shadow-accent/25 transition-transform hover:scale-105 duration-200">
-            <Shield className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-md bg-indigo-950/70 border border-indigo-700/50 flex items-center justify-center text-indigo-300 shadow-xs">
+            <Lock className="w-4 h-4 text-indigo-300" />
           </div>
-          <div>
-            <p className="text-white font-bold text-base leading-none tracking-tight">TrustVault</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="live-dot">
-                <span className="live-dot-ping"></span>
-                <span className="live-dot-core"></span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-100 font-bold text-sm tracking-tight font-sans">
+                TrustVault
               </span>
-              <p className="text-navy-400 text-[11px] font-medium tracking-wide uppercase">Encrypted Vault</p>
+              <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">
+                v2.4
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="live-dot">
+                <span className="live-dot-ping bg-emerald-400"></span>
+                <span className="live-dot-core bg-emerald-400"></span>
+              </span>
+              <span className="text-emerald-400 text-[11px] font-sans font-medium">
+                Verified Cloud
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-accent/20 text-accent-light shadow-xs'
-                  : 'text-navy-300 hover:bg-navy-900/80 hover:text-white hover:translate-x-0.5'
-              }`
-            }
-          >
-            <Icon className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:scale-110" />
-            <span className="truncate">{label}</span>
-          </NavLink>
-        ))}
-
-        {user?.role === 'admin' && (
-          <>
-            <div className="pt-5 pb-1 px-3">
-              <p className="text-[11px] font-semibold text-navy-400 uppercase tracking-wider">
-                Administration
-              </p>
-            </div>
-            {adminItems.map(({ to, icon: Icon, label }) => (
+      {/* Navigation Sections */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        <div>
+          <p className="px-3 pb-2 text-[11px] font-sans font-semibold text-zinc-500 uppercase tracking-wider">
+            Workspace
+          </p>
+          <div className="space-y-0.5">
+            {navItems.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={to === '/admin'}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  `flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-sans transition-colors ${
                     isActive
-                      ? 'bg-accent/20 text-accent-light shadow-xs'
-                      : 'text-navy-300 hover:bg-navy-900/80 hover:text-white hover:translate-x-0.5'
+                      ? 'bg-indigo-950/40 text-indigo-200 font-medium border-l-2 border-indigo-500 shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                   }`
                 }
               >
-                <Icon className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:scale-110" />
-                <span className="truncate">{label}</span>
+                {({ isActive }) => (
+                  <>
+                    <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-indigo-400' : 'text-zinc-400'}`} />
+                    <span className="truncate">{label}</span>
+                  </>
+                )}
               </NavLink>
             ))}
-          </>
+          </div>
+        </div>
+
+        {user?.role === 'admin' && (
+          <div>
+            <div className="flex items-center justify-between px-3 pb-2">
+              <p className="text-[11px] font-sans font-semibold text-zinc-500 uppercase tracking-wider">
+                Admin
+              </p>
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950/60 text-amber-300 border border-amber-800/60">
+                ADMIN
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {adminItems.map(({ to, icon: Icon, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/admin'}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-sans transition-colors ${
+                      isActive
+                        ? 'bg-indigo-950/40 text-indigo-200 font-medium border-l-2 border-indigo-500 shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-indigo-400' : 'text-zinc-400'}`} />
+                      <span className="truncate">{label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         )}
       </nav>
 
-      {/* User footer */}
-      <div className="border-t border-navy-800/80 bg-navy-950/40 p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent-light text-sm font-bold flex-shrink-0 shadow-inner">
-            {user?.full_name?.[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="text-white text-sm font-medium truncate">{user?.full_name}</p>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold tracking-wider uppercase ${
-                user?.role === 'admin' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30' : 'bg-slate-700/40 text-slate-300'
-              }`}>
-                {user?.role}
-              </span>
+      {/* User Footer Card */}
+      <div className="p-3 border-t border-zinc-800 bg-zinc-900/60">
+        <div className="p-2.5 rounded-md bg-zinc-950 border border-zinc-800 mb-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded bg-indigo-950/80 border border-indigo-700/60 flex items-center justify-center text-indigo-300 font-sans text-xs font-bold flex-shrink-0">
+              {user?.full_name?.[0]?.toUpperCase() ?? '?'}
             </div>
-            <p className="text-navy-400 text-xs truncate mt-0.5">{user?.email}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-zinc-200 text-xs font-medium truncate font-sans">
+                  {user?.full_name}
+                </p>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800 text-zinc-300 uppercase">
+                  {user?.role}
+                </span>
+              </div>
+              <p className="text-zinc-500 text-[11px] truncate font-sans mt-0.5">
+                {user?.email}
+              </p>
+            </div>
           </div>
         </div>
+
         <button
           onClick={handleLogout}
-          className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-navy-300 hover:bg-navy-900 hover:text-white transition-all active:scale-[0.98] border border-navy-800/60"
+          className="flex items-center justify-center gap-2 w-full px-3 py-1.5 rounded-md text-xs font-sans text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800 transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
-          Sign out
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>

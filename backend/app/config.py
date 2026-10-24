@@ -33,6 +33,26 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     @property
+    def async_database_url(self) -> str:
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    @property
+    def resolved_sync_database_url(self) -> str:
+        url = self.sync_database_url or self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        elif url.startswith("postgresql+asyncpg://"):
+            url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        elif url.startswith("sqlite+aiosqlite://"):
+            url = url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+        return url
+
+    @property
     def allowed_ext_set(self) -> set[str]:
         return {e.strip().lower() for e in self.allowed_extensions.split(",")}
 

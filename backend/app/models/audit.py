@@ -3,8 +3,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+# pyrefly: ignore[missing-import]
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+# pyrefly: ignore[missing-import]
 from sqlalchemy.dialects.postgresql import UUID
+# pyrefly: ignore[missing-import]
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base

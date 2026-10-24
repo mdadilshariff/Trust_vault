@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Shield, Eye, EyeOff, Lock, Sparkles, UserCheck, ShieldCheck } from 'lucide-react'
+import { Lock, Eye, EyeOff, ShieldCheck, Terminal, ArrowRight } from 'lucide-react'
 import { authApi } from '../api'
 import { useAuthStore } from '../store/auth'
+import { emitAppUpdate } from '../store/events'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
@@ -20,10 +21,22 @@ export default function LoginPage() {
     try {
       const r = await authApi.login(form)
       setUser(r.data)
-      toast.success(`Welcome back, ${r.data.full_name}!`)
+      emitAppUpdate({
+        action: 'USER_LOGIN',
+        actor: r.data.email,
+        outcome: 'success',
+        details: `Authenticated user session for ${r.data.email} [${r.data.role}].`,
+      })
+      toast.success(`Session authenticated: ${r.data.email}`)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'Login failed. Please verify credentials.')
+      setError(err.response?.data?.detail ?? 'Authentication failed. Please verify credentials.')
+      emitAppUpdate({
+        action: 'AUTH_FAILED',
+        actor: form.email || 'anonymous',
+        outcome: 'denied',
+        details: 'Rejected invalid credentials during session initialization.',
+      })
     } finally {
       setLoading(false)
     }
@@ -32,75 +45,85 @@ export default function LoginPage() {
   const fillDemo = (email: string, pass: string) => {
     setForm({ email, password: pass })
     setError('')
-    toast.success(`Loaded credentials for ${email}`, { duration: 1500 })
+    toast.success(`Injected credentials: ${email}`, { duration: 1500 })
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 selection:bg-zinc-800 selection:text-white font-sans">
       <div className="w-full max-w-md">
-        {/* Brand Logo & Title */}
+        {/* Brand Header */}
         <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center shadow-xl shadow-accent/20 mb-3 border border-accent-light/30">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 rounded-lg bg-indigo-950/70 border border-indigo-700/50 flex items-center justify-center text-indigo-300 mb-3 shadow-xs">
+            <Lock className="w-5 h-5 text-indigo-300" />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">TrustVault</h1>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="live-dot"><span className="live-dot-ping"></span><span className="live-dot-core"></span></span>
-            <span className="text-navy-300 text-xs font-medium">Enterprise Cryptographic Document Vault</span>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold font-sans tracking-tight text-zinc-100">
+              TrustVault
+            </h1>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400">
+              v2.4
+            </span>
           </div>
+          <p className="text-zinc-400 font-sans text-xs mt-1">
+            Secure Document Storage
+          </p>
         </div>
 
-        {/* Auth Glass Card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-7 shadow-glass">
-          <h2 className="text-lg font-bold text-white mb-1">Secure Sign In</h2>
-          <p className="text-xs text-navy-300 mb-5">
-            Sessions validated by Argon2id & cryptographic session tokens
-          </p>
+        {/* Auth Card */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 shadow-terminal">
+          <div className="pb-4 mb-4 border-b border-zinc-800">
+            <h2 className="text-sm font-sans font-bold text-zinc-200">
+              Sign In
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Enter your credentials to access your account
+            </p>
+          </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-200 text-xs flex items-start gap-2">
-              <span className="font-semibold text-red-100">Error:</span>
-              <span>{error}</span>
+            <div className="mb-4 p-3 rounded-md bg-zinc-950 border border-red-900/60 text-red-300 text-xs flex items-start gap-2">
+              <span className="font-semibold text-red-400">Error:</span>
+              <span className="truncate">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1.5">
-                Corporate Email
+              <label className="label">
+                Email Address
               </label>
               <input
                 id="login-email"
                 type="email"
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition-all"
+                className="input"
                 placeholder="you@company.com"
                 value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1.5">
-                Master Password
+              <label className="label">
+                Password
               </label>
               <div className="relative">
                 <input
                   id="login-password"
                   type={showPw ? 'text' : 'password'}
                   required
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-white/10 border border-white/15 text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition-all"
+                  className="input pr-9"
                   placeholder="••••••••••••"
                   value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-white transition-colors p-1"
+                  onClick={() => setShowPw((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
                   title={showPw ? 'Hide password' : 'Show password'}
                 >
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
@@ -109,62 +132,64 @@ export default function LoginPage() {
               id="login-submit"
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-semibold text-sm transition-all active:scale-[0.985] disabled:opacity-60 mt-3 flex items-center justify-center gap-2 shadow-lg shadow-accent/25"
+              className="btn-primary w-full py-2.5 font-sans text-xs mt-2"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
               ) : (
-                <Lock className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
               )}
-              <span>{loading ? 'Authenticating Session…' : 'Enter Vault'}</span>
+              <span>{loading ? 'Signing in...' : 'Sign In'}</span>
             </button>
           </form>
 
-          {/* Quick Demo Credentials Autofill Pills */}
-          <div className="mt-6 pt-5 border-t border-white/10">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-300 mb-2.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-accent-light" /> Quick Demo Personas
+          {/* Demo Credentials */}
+          <div className="mt-5 pt-4 border-t border-zinc-800">
+            <p className="text-[11px] font-sans font-medium text-zinc-400 mb-2.5 flex items-center gap-1.5">
+              <span>Demo Accounts (click to autofill)</span>
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 font-sans">
               <button
                 type="button"
                 onClick={() => fillDemo('admin@trustvault.dev', 'Admin1234!')}
-                className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white text-[11px] font-medium transition-all text-center group"
+                className="p-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-700/60 text-left transition-colors group"
               >
-                <span className="block font-semibold group-hover:text-accent-light">Admin</span>
-                <span className="text-[9px] text-navy-400 block truncate">admin@dev</span>
+                <span className="block text-xs font-semibold text-amber-300 group-hover:text-amber-200">Admin</span>
+                <span className="text-[10px] text-zinc-500 block truncate font-mono">admin@dev</span>
               </button>
               <button
                 type="button"
                 onClick={() => fillDemo('alice@trustvault.dev', 'Alice1234!')}
-                className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white text-[11px] font-medium transition-all text-center group"
+                className="p-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-sage-500/60 text-left transition-colors group"
               >
-                <span className="block font-semibold group-hover:text-accent-light">Owner</span>
-                <span className="text-[9px] text-navy-400 block truncate">alice@dev</span>
+                <span className="block text-xs font-semibold text-sage-300 group-hover:text-cream">Alice (Owner)</span>
+                <span className="text-[10px] text-zinc-500 block truncate font-mono">alice@dev</span>
               </button>
               <button
                 type="button"
                 onClick={() => fillDemo('bob@trustvault.dev', 'Bob12345!')}
-                className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white text-[11px] font-medium transition-all text-center group"
+                className="p-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-sage-500/60 text-left transition-colors group"
               >
-                <span className="block font-semibold group-hover:text-accent-light">Collaborator</span>
-                <span className="text-[9px] text-navy-400 block truncate">bob@dev</span>
+                <span className="block text-xs font-semibold text-cream group-hover:text-white">Bob (Member)</span>
+                <span className="text-[10px] text-zinc-500 block truncate font-mono">bob@dev</span>
               </button>
             </div>
           </div>
 
-          <p className="text-center text-navy-300 text-xs mt-6">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-accent-light hover:underline font-semibold">
-              Create an account
-            </Link>
-          </p>
+          <div className="mt-5 pt-3 border-t border-zinc-800 text-center">
+            <p className="text-zinc-400 text-xs font-sans">
+              Don't have an account?{' '}
+              <Link to="/register" className="text-zinc-200 hover:text-white underline font-medium">
+                Sign up
+              </Link>
+            </p>
+          </div>
         </div>
 
-        {/* Security Guarantee Footer */}
-        <div className="text-center text-navy-400 text-xs mt-6 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Zero-Knowledge Architecture · Strict Object-Level ACL</span>
+        {/* Security Tagline */}
+        <div className="text-center text-zinc-500 font-sans text-xs mt-5 flex items-center justify-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Protected with end-to-end security & encryption</span>
         </div>
       </div>
     </div>

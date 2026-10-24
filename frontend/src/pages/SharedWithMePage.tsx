@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Share2, FileText, Eye, Download, Search, User, Calendar, HardDrive } from 'lucide-react'
+import { Share2, FileText, Eye, Download, Search, User, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { documentsApi } from '../api'
 import type { DocumentListOut } from '../types'
 import { formatDistanceToNow } from 'date-fns'
@@ -26,107 +26,100 @@ export default function SharedWithMePage() {
     setLoading(false)
   }, [page, q])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    const handler = () => load()
+    window.addEventListener('tv:data-changed', handler)
+    return () => window.removeEventListener('tv:data-changed', handler)
+  }, [load])
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
+    <div className="space-y-6">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-800">Shared With Me</h1>
-            {data && (
-              <span className="badge-blue text-[11px] font-mono">
-                {data.total} {data.total === 1 ? 'document' : 'documents'}
-              </span>
-            )}
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold font-sans text-zinc-100 tracking-tight">
+              Shared with Me
+            </h1>
+            <span className="badge-blue text-[10px]">
+              {data ? `${data.total} shared files` : 'Loading...'}
+            </span>
           </div>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Confidential documents authorized for your account by other vault owners
+          <p className="text-zinc-400 font-sans text-xs mt-1">
+            Documents other team members have shared with your account
           </p>
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="card-sm">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* Search */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
           <input
-            className="input pl-10 pr-9"
-            placeholder="Search shared documents by title or filename…"
+            className="input pl-9 text-xs"
+            placeholder="Search shared files..."
             value={q}
-            onChange={e => { setQ(e.target.value); setPage(1) }}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setPage(1)
+            }}
           />
-          {q && (
-            <button
-              onClick={() => { setQ(''); setPage(1) }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 space-y-3">
-          <div className="w-9 h-9 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-slate-400 font-medium">Loading authorized documents...</p>
+        <div className="flex flex-col items-center justify-center py-24 space-y-3 font-sans text-xs text-zinc-500">
+          <div className="w-7 h-7 border-2 border-zinc-700 border-t-indigo-400 rounded-full animate-spin" />
+          <p>Loading shared documents...</p>
         </div>
       ) : !data?.items.length ? (
-        <div className="card text-center py-16 px-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
-            <Share2 className="w-7 h-7" />
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl text-center py-20 px-4 space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-600">
+            <Share2 className="w-6 h-6 text-sky-400" />
           </div>
-          <h3 className="font-semibold text-slate-800 mb-1">No shared documents</h3>
-          <p className="text-sm text-slate-400 max-w-sm mx-auto mb-4">
+          <h3 className="font-semibold text-zinc-200 text-sm">No shared documents</h3>
+          <p className="text-zinc-400 text-xs max-w-sm mx-auto">
             {q
-              ? 'No documents matched your search query.'
-              : 'When colleagues grant your username read or edit permissions to a vault asset, it will securely appear here.'}
+              ? 'No shared documents match your active search query.'
+              : 'When another user grants you read or edit access to a document, it will appear here.'}
           </p>
-          {q && (
-            <button
-              onClick={() => { setQ(''); setPage(1) }}
-              className="btn-secondary text-xs inline-flex"
-            >
-              Clear Search
-            </button>
-          )}
         </div>
       ) : (
-        <>
-          <div className="card p-0 overflow-hidden border border-slate-200/70 shadow-sm">
-            <table className="w-full">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200/80">
-                  <th className="text-left table-header">Document</th>
-                  <th className="text-left table-header hidden sm:table-cell">Owner</th>
-                  <th className="text-left table-header">Your Access</th>
-                  <th className="text-left table-header hidden md:table-cell">Size</th>
-                  <th className="text-left table-header hidden lg:table-cell">Shared</th>
-                  <th className="table-header text-right">Actions</th>
+                <tr className="border-b border-zinc-800 bg-zinc-950/80 text-[11px] text-zinc-400 uppercase tracking-wider">
+                  <th className="py-3 px-4 font-medium">Document</th>
+                  <th className="py-3 px-4 font-medium hidden sm:table-cell">Owner</th>
+                  <th className="py-3 px-4 font-medium">Privilege</th>
+                  <th className="py-3 px-4 font-medium hidden md:table-cell">Size</th>
+                  <th className="py-3 px-4 font-medium hidden lg:table-cell">Shared</th>
+                  <th className="py-3 px-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {data.items.map(doc => (
-                  <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-4 py-3.5">
+              <tbody className="divide-y divide-zinc-850">
+                {data.items.map((doc) => (
+                  <tr
+                    key={doc.id}
+                    className="hover:bg-zinc-850/40 transition-colors group"
+                  >
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-200">
+                        <div className="w-9 h-9 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-sky-400 group-hover:border-sky-800/80 group-hover:bg-sky-950/30 transition-all flex-shrink-0">
                           <FileText className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                           <Link
                             to={`/documents/${doc.id}`}
-                            className="font-semibold text-slate-800 hover:text-accent transition-colors truncate block max-w-xs sm:max-w-sm"
+                            className="font-medium text-zinc-200 hover:text-white transition-colors truncate block max-w-xs sm:max-w-sm text-xs"
                           >
                             {doc.title}
                           </Link>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                            <span className="font-mono truncate">{doc.original_filename}</span>
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
+                            <span className="truncate">{doc.original_filename}</span>
                             {doc.category && (
                               <>
                                 <span>•</span>
@@ -138,52 +131,45 @@ export default function SharedWithMePage() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 hidden sm:table-cell">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[11px] font-bold">
-                          {(doc.owner_username ?? 'O')[0].toUpperCase()}
-                        </div>
-                        <span className="text-xs font-medium text-slate-700">
-                          {doc.owner_username ?? 'Unknown'}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`badge text-[11px] font-semibold ${
-                          doc.my_permission === 'edit' ? 'badge-yellow' : 'badge-gray'
-                        }`}
-                      >
-                        {doc.my_permission === 'edit' ? 'CAN EDIT' : 'READ ONLY'}
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className="text-zinc-300 text-xs">
+                        @{doc.owner_username ?? 'System'}
                       </span>
                     </td>
 
-                    <td className="px-4 py-3.5 text-xs text-slate-500 font-mono hidden md:table-cell">
+                    <td className="px-4 py-3">
+                      <span className={`badge text-[10px] capitalize font-medium ${
+                        doc.my_permission === 'edit' ? 'badge-yellow' : 'badge-blue'
+                      }`}>
+                        {doc.my_permission === 'edit' ? 'Can Edit' : 'Can View'}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">
                       {formatBytes(doc.file_size)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-xs text-slate-500 hidden lg:table-cell">
+                    <td className="px-4 py-3 text-zinc-400 hidden lg:table-cell">
                       {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
                     </td>
 
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center gap-1.5 justify-end">
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center gap-1 justify-end">
                         <Link
                           to={`/documents/${doc.id}`}
-                          className="btn-ghost p-2 rounded-lg text-slate-500 hover:text-accent"
-                          title="View Details"
+                          className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                          title="View details"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </Link>
                         <a
                           href={documentsApi.downloadUrl(doc.id)}
-                          className="btn-ghost p-2 rounded-lg text-slate-500 hover:text-emerald-600"
-                          title="Download File"
+                          className="p-1.5 rounded-md text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition-colors"
+                          title="Download file"
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-3.5 h-3.5" />
                         </a>
                       </div>
                     </td>
@@ -193,30 +179,33 @@ export default function SharedWithMePage() {
             </table>
           </div>
 
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-slate-500">
-                {data.total} shared items · page {page} of {totalPages}
-              </p>
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800 text-xs text-zinc-400 bg-zinc-950/60">
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setPage(p => p - 1)}
-                  disabled={page === 1}
-                  className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="btn-secondary py-1 px-2.5 text-xs disabled:opacity-30"
                 >
-                  Previous
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
                 </button>
                 <button
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={page === totalPages}
-                  className="btn-secondary py-1.5 px-3 text-xs disabled:opacity-40"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="btn-secondary py-1 px-2.5 text-xs disabled:opacity-30"
                 >
-                  Next
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

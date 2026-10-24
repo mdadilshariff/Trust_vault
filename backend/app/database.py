@@ -18,7 +18,7 @@ if "sqlite" not in settings.database_url:
     })
 
 engine = create_async_engine(
-    settings.database_url,
+    settings.async_database_url,
     **engine_kwargs,
 )
 

@@ -1,7 +1,11 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Upload, FileText, X, Check, AlertCircle } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import {
+  Upload, FileText, X, Check, Lock, ShieldCheck,
+  ArrowLeft, AlertCircle, FileCheck, Info
+} from 'lucide-react'
 import { documentsApi } from '../api'
+import { emitAppUpdate } from '../store/events'
 import toast from 'react-hot-toast'
 
 const CATEGORIES = ['contract', 'report', 'invoice', 'presentation', 'other']
@@ -17,20 +21,19 @@ export default function UploadPage() {
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [form, setForm] = useState({ title: '', description: '', category: '' })
+  const [form, setForm] = useState({ title: '', description: '', category: 'contract' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [drag, setDrag] = useState(false)
 
   const pickFile = (f: File | null) => {
     if (!f) return
     if (f.size > MAX_MB * 1048576) {
-      toast.error(`File exceeds ${MAX_MB} MB limit.`)
+      toast.error(`File size exceeds maximum ${MAX_MB} MB limit.`)
       return
     }
     setFile(f)
-    if (!form.title) setForm(v => ({ ...v, title: f.name.replace(/\.[^.]+$/, '') }))
+    if (!form.title) setForm((v) => ({ ...v, title: f.name.replace(/\.[^.]+$/, '') }))
     setErrors({})
   }
 
@@ -42,8 +45,8 @@ export default function UploadPage() {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!file) e.file = 'Please select a file'
-    if (!form.title.trim()) e.title = 'Title is required'
+    if (!file) e.file = 'Please choose a file to upload'
+    if (!form.title.trim()) e.title = 'Document title is required'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -52,135 +55,244 @@ export default function UploadPage() {
     e.preventDefault()
     if (!validate()) return
     setUploading(true)
-    setProgress(0)
     const fd = new FormData()
     fd.append('file', file!)
     fd.append('title', form.title.trim())
     if (form.description) fd.append('description', form.description)
     if (form.category) fd.append('category', form.category)
+
     try {
       const r = await documentsApi.upload(fd)
-      toast.success('Document uploaded successfully!')
+      emitAppUpdate({
+        action: 'DOC_UPLOADED',
+        resource: r.data.id,
+        outcome: 'success',
+        details: `Uploaded "${r.data.title}" (${formatBytes(r.data.file_size)}).`,
+      })
+      toast.success('Document uploaded successfully')
       navigate(`/documents/${r.data.id}`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Upload failed.')
+      emitAppUpdate({
+        action: 'UPLOAD_FAILED',
+        outcome: 'error',
+        details: `Failed to upload "${form.title}": ${err.response?.data?.detail || 'Validation error'}`,
+      })
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-      <div className="pb-3 border-b border-slate-200/60">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Upload Document</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Files are validated with magic signature detection and stored in zero-leak private storage.
-        </p>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold font-sans text-zinc-100 tracking-tight">
+              Upload Document
+            </h1>
+            <span className="badge-blue text-[10px]">
+              Secure Ingestion
+            </span>
+          </div>
+          <p className="text-zinc-400 font-sans text-xs mt-1">
+            Files are cryptographically verified, encrypted, and isolated in storage
+          </p>
+        </div>
+        <Link to="/documents" className="btn-secondary text-xs inline-flex items-center gap-1.5">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Documents</span>
+        </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Drop zone */}
-        <div
-          className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 cursor-pointer ${
-            drag
-              ? 'border-accent bg-accent/5 scale-[1.01] shadow-lg shadow-accent/10'
-              : file
-              ? 'border-emerald-300 bg-emerald-50/20'
-              : errors.file
-              ? 'border-red-400 bg-red-50/20'
-              : 'border-slate-200 hover:border-accent hover:bg-slate-50/50 hover:shadow-sm'
-          }`}
-          onDragOver={e => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            onChange={e => pickFile(e.target.files?.[0] ?? null)}
-          />
-          {file ? (
-            <div className="flex items-center gap-4 p-2 bg-white rounded-xl shadow-xs border border-emerald-200">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100/70 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div className="text-left flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-slate-800 text-sm truncate">{file.name}</p>
-                  <span className="badge-green text-[11px] font-mono uppercase">
-                    <Check className="w-3 h-3 text-emerald-600" /> Ready
-                  </span>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (5 cols): Interactive Dropzone & Selected File Info */}
+        <div className="lg:col-span-5 space-y-4">
+          <div
+            className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[280px] ${
+              drag
+                ? 'border-indigo-500 bg-indigo-950/30 scale-[0.99]'
+                : file
+                ? 'border-emerald-600/70 bg-emerald-950/20'
+                : errors.file
+                ? 'border-rose-700 bg-rose-950/20'
+                : 'border-zinc-800 hover:border-indigo-500/60 hover:bg-zinc-900/60 bg-zinc-900/40'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDrag(true)
+            }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+            />
+
+            {file ? (
+              <div className="space-y-3 w-full">
+                <div className="w-12 h-12 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 flex items-center justify-center mx-auto shadow-xs">
+                  <FileCheck className="w-6 h-6" />
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">{formatBytes(file.size)} • Click to replace</p>
+                <div>
+                  <p className="font-semibold text-zinc-100 text-xs truncate max-w-xs mx-auto">
+                    {file.name}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    {formatBytes(file.size)} · Ready to ingest
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setFile(null)
+                  }}
+                  className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] inline-flex items-center gap-1 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Choose different file</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setFile(null) }}
-                className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                title="Remove file"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="py-4">
-              <div className="w-14 h-14 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto mb-3 shadow-xs">
-                <Upload className="w-7 h-7" />
+            ) : (
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mx-auto shadow-xs">
+                  <Upload className="w-6 h-6 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-200 text-xs">
+                    Drag and drop file here, or <span className="text-indigo-400 underline">browse</span>
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Max file payload: {MAX_MB} MB
+                  </p>
+                </div>
               </div>
-              <p className="text-slate-800 font-semibold text-sm">Drag and drop file here, or click to browse</p>
-              <p className="text-slate-400 text-xs mt-1.5 max-w-sm mx-auto">
-                PDF, DOCX, XLSX, PPTX, PNG, JPG, ZIP, CSV, MD · up to {MAX_MB} MB
-              </p>
-              {errors.file && <p className="text-red-500 text-xs font-medium mt-3">{errors.file}</p>}
-            </div>
+            )}
+          </div>
+
+          {errors.file && (
+            <p className="text-rose-400 text-xs flex items-center gap-1.5 font-medium">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{errors.file}</span>
+            </p>
           )}
+
+          {/* Supported Types Chips */}
+          <div className="p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl space-y-2 text-xs">
+            <span className="text-zinc-400 text-[11px] font-medium block">Supported Formats:</span>
+            <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
+              {['PDF', 'DOCX', 'XLSX', 'PPTX', 'TXT', 'PNG', 'ZIP', 'CSV'].map((ext) => (
+                <span key={ext} className="px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-zinc-400">
+                  {ext}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Metadata */}
-        <div className="card space-y-4">
+        {/* Right Column (7 cols): Document Metadata & Ingestion */}
+        <div className="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-5 shadow-card">
+          <div className="pb-3 border-b border-zinc-800">
+            <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+              Document Properties
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Specify indexing details and security classification
+            </p>
+          </div>
+
+          {/* Document Title */}
           <div>
             <label className="label">
-              Document Title <span className="text-red-500">*</span>
+              Document Title <span className="text-rose-400">*</span>
             </label>
             <input
-              className={`input ${errors.title ? 'input-error' : ''}`}
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              type="text"
+              required
               placeholder="e.g. Q4 Financial Audit Report"
+              className={`input text-xs ${errors.title ? 'input-error' : ''}`}
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             />
-            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+            {errors.title && (
+              <p className="text-rose-400 text-xs mt-1">{errors.title}</p>
+            )}
           </div>
-          <div>
-            <label className="label">Description (Optional)</label>
-            <textarea
-              className="input min-h-[85px] resize-none"
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Provide context or summary for collaborators…"
-            />
-          </div>
-          <div>
-            <label className="label">Category</label>
-            <select
-              className="input capitalize"
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-            >
-              <option value="">Select category (optional)</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
 
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={uploading} className="btn-primary flex-1 justify-center py-2.5">
-            {uploading
-              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Storing Encrypted File…</>
-              : <><Upload className="w-4 h-4" /> Upload Document</>}
-          </button>
-          <button type="button" onClick={() => navigate('/documents')} className="btn-secondary">
-            Cancel
+          {/* Category Selector Chips */}
+          <div>
+            <label className="label">
+              Document Classification
+            </label>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {CATEGORIES.map((cat) => {
+                const isSelected = form.category === cat
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, category: cat }))}
+                    className={`py-2 px-2.5 rounded-lg border text-xs capitalize text-center transition-all ${
+                      isSelected
+                        ? 'bg-indigo-950/80 border-indigo-600 text-indigo-200 font-medium shadow-xs'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="label">
+              Description (Optional)
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Add key notes, reference numbers, or context for collaborators..."
+              className="input text-xs leading-relaxed"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+
+          {/* Security & Hash Assurance Notice */}
+          <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5 text-xs text-zinc-400">
+            <div className="flex items-center gap-2 text-zinc-200 font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Automatic Cryptographic Sealing</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              Upon upload, a SHA-256 fingerprint will be chained to the immutable audit sequence. The raw payload is stored under a server-generated UUID with access strictly limited to you and designated users.
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={uploading}
+            className="btn-primary w-full py-2.5 text-xs font-medium flex items-center justify-center gap-2"
+          >
+            {uploading ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Encrypting & Ingesting Payload...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Document to Vault</span>
+              </>
+            )}
           </button>
         </div>
       </form>

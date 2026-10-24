@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Shield, UserPlus, Eye, EyeOff, ShieldCheck, Check } from 'lucide-react'
+import { Lock, UserPlus, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react'
 import { authApi } from '../api'
 import { useAuthStore } from '../store/auth'
+import { emitAppUpdate } from '../store/events'
 import toast from 'react-hot-toast'
 
 export default function RegisterPage() {
@@ -42,131 +43,135 @@ export default function RegisterPage() {
       // Auto-login after registration
       const login = await authApi.login({ email: form.email, password: form.password })
       setUser(login.data)
-      toast.success(`Account registered! Welcome to TrustVault, ${login.data.full_name}.`)
+      emitAppUpdate({
+        action: 'USER_REGISTERED',
+        actor: login.data.email,
+        outcome: 'success',
+        details: `Provisioned cryptographic key pair and user profile for ${login.data.username}.`,
+      })
+      toast.success(`Vault provisioned for ${login.data.full_name}`)
       navigate('/dashboard')
     } catch (err: any) {
       const msg = err.response?.data?.detail ?? 'Registration failed. Please check inputs.'
       toast.error(msg)
+      emitAppUpdate({
+        action: 'REGISTRATION_FAILED',
+        actor: form.email || 'anonymous',
+        outcome: 'error',
+        details: `Registration rejected: ${msg}`,
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 selection:bg-zinc-800 selection:text-white">
       <div className="w-full max-w-md">
-        {/* Brand Logo & Title */}
+        {/* Brand Header */}
         <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center shadow-xl shadow-accent/20 mb-3 border border-accent-light/30">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 rounded-lg bg-indigo-950/70 border border-indigo-700/50 flex items-center justify-center text-indigo-300 mb-3 shadow-xs">
+            <Lock className="w-5 h-5 text-indigo-300" />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">TrustVault</h1>
-          <p className="text-navy-300 mt-1 text-xs">Provision a New Cryptographic Vault Account</p>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+            TrustVault
+          </h1>
+          <p className="text-zinc-500 text-xs mt-1">
+            Secure Document Storage
+          </p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-7 shadow-glass">
-          <h2 className="text-lg font-bold text-white mb-1">Create Account</h2>
-          <p className="text-xs text-navy-300 mb-5">
-            Passwords hashed with memory-hard Argon2id
-          </p>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 shadow-terminal">
+          <div className="pb-4 mb-4 border-b border-zinc-800">
+            <h2 className="text-sm font-medium text-zinc-100">
+              Create an Account
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Enter your details to create your secure account
+            </p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1">
+              <label className="label">
                 Full Name
               </label>
               <input
                 id="reg-fullname"
                 type="text"
                 required
-                className={`w-full px-3.5 py-2.5 rounded-xl bg-white/10 border text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.full_name
-                    ? 'border-red-400/80 focus:ring-red-400/40'
-                    : 'border-white/15 focus:ring-accent/60 focus:border-accent'
-                }`}
+                className={`input ${errors.full_name ? 'input-error' : ''}`}
                 placeholder="Jane Doe"
                 value={form.full_name}
-                onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               />
               {errors.full_name && (
-                <p className="text-red-300 text-xs mt-1">{errors.full_name}</p>
+                <p className="text-red-400 text-xs mt-1">{errors.full_name}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1">
-                Corporate Email
+              <label className="label">
+                Email Address
               </label>
               <input
                 id="reg-email"
                 type="email"
                 required
-                className={`w-full px-3.5 py-2.5 rounded-xl bg-white/10 border text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.email
-                    ? 'border-red-400/80 focus:ring-red-400/40'
-                    : 'border-white/15 focus:ring-accent/60 focus:border-accent'
-                }`}
+                className={`input ${errors.email ? 'input-error' : ''}`}
                 placeholder="jane@company.com"
                 value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
               {errors.email && (
-                <p className="text-red-300 text-xs mt-1">{errors.email}</p>
+                <p className="text-red-400 text-xs mt-1">{errors.email}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1">
-                Vault Username
+              <label className="label">
+                Username
               </label>
               <input
                 id="reg-username"
                 type="text"
                 required
-                className={`w-full px-3.5 py-2.5 rounded-xl bg-white/10 border text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.username
-                    ? 'border-red-400/80 focus:ring-red-400/40'
-                    : 'border-white/15 focus:ring-accent/60 focus:border-accent'
-                }`}
+                className={`input ${errors.username ? 'input-error' : ''}`}
                 placeholder="janedoe"
                 value={form.username}
-                onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
               />
               {errors.username && (
-                <p className="text-red-300 text-xs mt-1">{errors.username}</p>
+                <p className="text-red-400 text-xs mt-1">{errors.username}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-navy-200 mb-1">
-                Master Password
+              <label className="label">
+                Password (min. 8 characters)
               </label>
               <div className="relative">
                 <input
                   id="reg-password"
                   type={showPw ? 'text' : 'password'}
                   required
-                  className={`w-full px-3.5 py-2.5 pr-10 rounded-xl bg-white/10 border text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 transition-all ${
-                    errors.password
-                      ? 'border-red-400/80 focus:ring-red-400/40'
-                      : 'border-white/15 focus:ring-accent/60 focus:border-accent'
-                  }`}
-                  placeholder="Min 8 characters"
+                  className={`input pr-9 ${errors.password ? 'input-error' : ''}`}
+                  placeholder="••••••••••••"
                   value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-white transition-colors p-1"
+                  onClick={() => setShowPw((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
                   title={showPw ? 'Hide password' : 'Show password'}
                 >
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-red-300 text-xs mt-1">{errors.password}</p>
+                <p className="text-red-400 text-xs mt-1">{errors.password}</p>
               )}
             </div>
 
@@ -174,29 +179,31 @@ export default function RegisterPage() {
               id="reg-submit"
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-semibold text-sm transition-all active:scale-[0.985] disabled:opacity-60 mt-3 flex items-center justify-center gap-2 shadow-lg shadow-accent/25"
+              className="btn-primary w-full py-2.5 text-xs font-medium mt-2"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
               ) : (
-                <UserPlus className="w-4 h-4" />
+                <UserPlus className="w-3.5 h-3.5" />
               )}
-              <span>{loading ? 'Provisioning Vault…' : 'Complete Registration'}</span>
+              <span>{loading ? 'Creating account...' : 'Create Account'}</span>
             </button>
           </form>
 
-          <p className="text-center text-navy-300 text-xs mt-6">
-            Already have an active account?{' '}
-            <Link to="/login" className="text-accent-light hover:underline font-semibold">
-              Sign in
-            </Link>
-          </p>
+          <div className="mt-5 pt-3 border-t border-zinc-800 text-center">
+            <p className="text-zinc-500 text-xs">
+              Already have an account?{' '}
+              <Link to="/login" className="text-zinc-200 hover:text-white underline font-medium">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
 
         {/* Security Assurance */}
-        <div className="text-center text-navy-400 text-xs mt-6 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Immutable Audit Logging · End-to-End Cryptographic Chain</span>
+        <div className="text-center text-zinc-500 text-xs mt-5 flex items-center justify-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Protected with end-to-end security & encryption</span>
         </div>
       </div>
     </div>

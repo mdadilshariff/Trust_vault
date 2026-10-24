@@ -5,7 +5,9 @@ Revises:
 Create Date: 2026-10-20
 """
 from alembic import op
+# pyrefly: ignore[missing-import]
 import sqlalchemy as sa
+# pyrefly: ignore[missing-import]
 from sqlalchemy.dialects import postgresql
 
 revision = "0001"

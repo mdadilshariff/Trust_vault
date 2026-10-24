@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  FileText, Download, Trash2, Edit2, Share2, ArrowLeft,
-  Calendar, HardDrive, Tag, User, Save, X, Lock, ShieldCheck,
-  Copy, Check, ShieldAlert, KeyRound, Clock, AlertCircle
+  FileText, ArrowLeft, Download, Trash2, Edit3, Share2,
+  Lock, ShieldCheck, User, Calendar, Clock, HardDrive,
+  Copy, Check, Save, X, KeyRound, AlertTriangle
 } from 'lucide-react'
 import { documentsApi, permissionsApi } from '../api'
-import { useAuthStore } from '../store/auth'
 import type { Document, Permission } from '../types'
-import { format, formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
+import { emitAppUpdate } from '../store/events'
 import toast from 'react-hot-toast'
 
 function formatBytes(b: number) {
@@ -20,7 +20,6 @@ function formatBytes(b: number) {
 export default function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const [doc, setDoc] = useState<Document | null>(null)
   const [perms, setPerms] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,7 +31,7 @@ export default function DocumentDetailPage() {
   const [copiedId, setCopiedId] = useState(false)
 
   const isOwner = doc?.my_permission === 'owner'
-  const canEdit = doc?.my_permission === 'owner' || doc?.my_permission === 'edit'
+  const canEdit = isOwner || doc?.my_permission === 'edit'
 
   const load = async () => {
     if (!id) return
@@ -40,7 +39,11 @@ export default function DocumentDetailPage() {
     try {
       const r = await documentsApi.get(id)
       setDoc(r.data)
-      setEditForm({ title: r.data.title, description: r.data.description ?? '', category: r.data.category ?? '' })
+      setEditForm({
+        title: r.data.title,
+        description: r.data.description || '',
+        category: r.data.category || '',
+      })
       if (r.data.my_permission === 'owner') {
         const p = await permissionsApi.list(id)
         setPerms(p.data)
@@ -53,13 +56,15 @@ export default function DocumentDetailPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    load()
+  }, [id])
 
   const copyDocId = () => {
     if (!doc) return
     navigator.clipboard.writeText(doc.id)
     setCopiedId(true)
-    toast.success('Document UUID copied to clipboard')
+    toast.success('Document UUID copied')
     setTimeout(() => setCopiedId(false), 2000)
   }
 
@@ -70,7 +75,13 @@ export default function DocumentDetailPage() {
       const r = await documentsApi.update(id, editForm)
       setDoc(r.data)
       setEditing(false)
-      toast.success('Document updated successfully')
+      emitAppUpdate({
+        action: 'DOC_UPDATED',
+        resource: id,
+        outcome: 'success',
+        details: `Updated details for "${r.data.title}".`,
+      })
+      toast.success('Document updated')
     } catch (e: any) {
       toast.error(e.response?.data?.detail ?? 'Update failed')
     }
@@ -79,10 +90,16 @@ export default function DocumentDetailPage() {
 
   const handleDelete = async () => {
     if (!id || !doc) return
-    if (!confirm(`Permanently delete "${doc.title}"? This action cannot be undone.`)) return
+    if (!confirm(`Are you sure you want to delete "${doc.title}"? This cannot be undone.`)) return
     try {
       await documentsApi.delete(id)
-      toast.success('Document securely purged')
+      emitAppUpdate({
+        action: 'DOC_DELETED',
+        resource: id,
+        outcome: 'success',
+        details: `Deleted document "${doc.title}".`,
+      })
+      toast.success('Document deleted')
       navigate('/documents')
     } catch (e: any) {
       toast.error(e.response?.data?.detail ?? 'Delete failed')
@@ -96,14 +113,24 @@ export default function DocumentDetailPage() {
     try {
       const r = await permissionsApi.grant(id, {
         username: shareForm.username.trim(),
-        permission: shareForm.permission
+        permission: shareForm.permission,
       })
-      setPerms(p => {
-        const existing = p.findIndex(x => x.id === r.data.id)
-        if (existing >= 0) { const n = [...p]; n[existing] = r.data; return n }
+      setPerms((p) => {
+        const existing = p.findIndex((x) => x.id === r.data.id)
+        if (existing >= 0) {
+          const n = [...p]
+          n[existing] = r.data
+          return n
+        }
         return [...p, r.data]
       })
       const targetUser = shareForm.username.trim()
+      emitAppUpdate({
+        action: 'ACCESS_GRANTED',
+        resource: id,
+        outcome: 'success',
+        details: `Shared "${doc?.title}" with ${targetUser} (${shareForm.permission}).`,
+      })
       setShareForm({ username: '', permission: 'read' })
       toast.success(`Access granted to ${targetUser}`)
     } catch (e: any) {
@@ -114,21 +141,27 @@ export default function DocumentDetailPage() {
 
   const handleRevoke = async (permId: string, username: string) => {
     if (!id) return
-    if (!confirm(`Revoke ${username}'s access? Future requests will be blocked immediately.`)) return
+    if (!confirm(`Remove access for ${username}?`)) return
     try {
       await permissionsApi.revoke(id, permId)
-      setPerms(p => p.filter(x => x.id !== permId))
-      toast.success(`Access revoked for ${username}`)
+      setPerms((p) => p.filter((x) => x.id !== permId))
+      emitAppUpdate({
+        action: 'ACCESS_REVOKED',
+        resource: id,
+        outcome: 'success',
+        details: `Removed access for ${username} on "${doc?.title}".`,
+      })
+      toast.success(`Access removed for ${username}`)
     } catch (e: any) {
-      toast.error(e.response?.data?.detail ?? 'Revocation failed')
+      toast.error(e.response?.data?.detail ?? 'Failed to remove access')
     }
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-3">
-        <div className="w-9 h-9 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-slate-400 font-medium">Decrypting vault metadata...</p>
+      <div className="flex flex-col items-center justify-center py-28 space-y-3 text-xs text-zinc-500">
+        <div className="w-7 h-7 border-2 border-zinc-700 border-t-indigo-400 rounded-full animate-spin" />
+        <p>Loading document details...</p>
       </div>
     )
   }
@@ -136,345 +169,329 @@ export default function DocumentDetailPage() {
   if (!doc) return null
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Top Bar with Navigation & Actions */}
-      <div>
-        <button
-          onClick={() => navigate('/documents')}
-          className="btn-ghost mb-4 -ml-2 text-xs text-slate-500 hover:text-slate-800 group inline-flex items-center gap-1.5"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
-          <span>Back to Documents</span>
-        </button>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
-          <div className="flex items-start gap-4">
-            <div className="w-13 h-13 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0 text-accent shadow-xs">
-              <FileText className="w-7 h-7" />
-            </div>
-            <div>
-              {editing ? (
-                <input
-                  className="input text-xl font-bold max-w-lg mb-1"
-                  value={editForm.title}
-                  onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Document Title"
-                />
-              ) : (
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold text-slate-800">{doc.title}</h1>
-                  <span className="badge-blue uppercase font-mono text-[11px] tracking-wider font-semibold">
-                    .{doc.file_extension}
-                  </span>
-                </div>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/documents"
+            className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors"
+            title="Back to directory"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold font-sans text-zinc-100 tracking-tight truncate max-w-md sm:max-w-xl">
+                {doc.title}
+              </h1>
+              {doc.category && (
+                <span className={`badge text-[10px] capitalize font-medium ${
+                  doc.category === 'contract' ? 'badge-blue' :
+                  doc.category === 'report' ? 'badge-green' :
+                  doc.category === 'invoice' ? 'badge-yellow' :
+                  doc.category === 'presentation' ? 'badge-purple' :
+                  'badge-mono'
+                }`}>
+                  {doc.category}
+                </span>
               )}
-              <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                <span className="font-mono">{doc.original_filename}</span>
-                <span>•</span>
-                <button
-                  onClick={copyDocId}
-                  className="inline-flex items-center gap-1 font-mono text-slate-500 hover:text-accent transition-colors"
-                  title="Click to copy full UUID"
-                >
-                  {copiedId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                  <span>{doc.id.slice(0, 8)}...</span>
-                </button>
-              </div>
             </div>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Original: <span className="text-zinc-300 font-mono text-[11px]">{doc.original_filename}</span> · {formatBytes(doc.file_size)}
+            </p>
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {canEdit && !editing && (
-              <button onClick={() => setEditing(true)} className="btn-secondary text-xs">
-                <Edit2 className="w-3.5 h-3.5" /> Edit Metadata
-              </button>
-            )}
-            {editing && (
-              <>
-                <button onClick={handleSave} disabled={saving} className="btn-primary text-xs">
-                  <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button onClick={() => setEditing(false)} className="btn-secondary text-xs">
-                  <X className="w-3.5 h-3.5" /> Cancel
-                </button>
-              </>
-            )}
-            <a
-              href={documentsApi.downloadUrl(doc.id)}
-              className="btn-primary text-xs shadow-sm hover:shadow-md"
-              target="_blank"
-              rel="noreferrer"
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <a
+            href={documentsApi.downloadUrl(doc.id)}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary text-xs inline-flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download File</span>
+          </a>
+
+          {canEdit && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="btn-secondary text-xs inline-flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5" /> Download File
-            </a>
-            {isOwner && (
-              <button
-                onClick={handleDelete}
-                className="btn-danger text-xs p-2"
-                title="Purge Document"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+              <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Edit Details</span>
+            </button>
+          )}
+
+          {isOwner && (
+            <button
+              onClick={handleDelete}
+              className="btn-danger text-xs inline-flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Details and Permissions Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Metadata Card */}
-          <div className="card space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <Tag className="w-4 h-4 text-accent" /> Document Information
+      {/* Main Split Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (7 cols): Document Overview & Technical Specs */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Properties & Description Card */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-card">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-400" />
+                <span>Document Details</span>
               </h2>
-              <span className={`badge ${
-                doc.my_permission === 'owner' ? 'badge-blue' :
-                doc.my_permission === 'edit' ? 'badge-yellow' : 'badge-gray'
-              }`}>
-                Your Role: {(doc.my_permission || 'read').toUpperCase()}
-              </span>
+              {editing && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="p-1 rounded text-zinc-400 hover:text-zinc-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="btn-primary py-1 px-3 text-xs"
+                  >
+                    <Save className="w-3 h-3" />
+                    <span>{saving ? 'Saving...' : 'Save'}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="label">Description</label>
-                {editing ? (
-                  <textarea
-                    className="input min-h-[90px] resize-none"
-                    value={editForm.description}
-                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                    placeholder="Provide context or a brief summary of this confidential document..."
+            {editing ? (
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="label">Title</label>
+                  <input
+                    type="text"
+                    className="input text-xs"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
                   />
-                ) : (
-                  <p className="text-sm text-slate-600 bg-slate-50/70 p-3.5 rounded-lg border border-slate-100/80 leading-relaxed">
-                    {doc.description || <span className="text-slate-400 italic">No description provided for this document.</span>}
-                  </p>
-                )}
+                </div>
+                <div>
+                  <label className="label">Category</label>
+                  <select
+                    className="input text-xs"
+                    value={editForm.category}
+                    onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                  >
+                    <option value="">No Category</option>
+                    <option value="contract">Contract</option>
+                    <option value="report">Report</option>
+                    <option value="invoice">Invoice</option>
+                    <option value="presentation">Presentation</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Description</label>
+                  <textarea
+                    rows={3}
+                    className="input text-xs leading-relaxed"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="Brief description of file contents..."
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <div>
+                  <span className="text-zinc-400 text-[11px] block mb-1.5 font-medium">
+                    Description & Notes
+                  </span>
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/80 text-zinc-300 text-xs leading-relaxed">
+                    {doc.description || 'No description provided for this document.'}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                    <span className="text-zinc-400 text-[11px] block font-medium">
+                      Your Permission
+                    </span>
+                    <span className="badge-blue text-[11px] uppercase font-semibold mt-1">
+                      {doc.my_permission || 'Read'}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                    <span className="text-zinc-400 text-[11px] block font-medium">
+                      Owner
+                    </span>
+                    <span className="text-zinc-200 font-medium block mt-1">
+                      @{doc.owner_username ?? 'System'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Technical File Metadata Card */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-card">
+            <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider pb-3 border-b border-zinc-800">
+              Storage & Cryptographic Attributes
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                <span className="text-zinc-400 text-[11px]">Storage UUID</span>
+                <p className="font-mono text-[11px] text-zinc-300 truncate">{doc.id}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                <span className="text-zinc-400 text-[11px]">MIME Type</span>
+                <p className="font-mono text-[11px] text-zinc-300 truncate">{doc.mime_type}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                <span className="text-zinc-400 text-[11px]">Uploaded Date</span>
+                <p className="text-zinc-300 text-xs">{format(new Date(doc.created_at), 'MMM d, yyyy h:mm a')}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                <span className="text-zinc-400 text-[11px]">Last Modified</span>
+                <p className="text-zinc-300 text-xs">{format(new Date(doc.updated_at), 'MMM d, yyyy h:mm a')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (5 cols): Collaborators & Sharing Access Control */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Sharing & Access Control Card */}
+          {isOwner ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-card">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-indigo-400" />
+                  <h2 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                    Access Control List
+                  </h2>
+                </div>
+                <span className="badge-blue text-[10px]">
+                  {perms.length} Collaborators
+                </span>
               </div>
 
-              <div>
-                <label className="label">Category</label>
-                {editing ? (
+              {/* Share Form */}
+              <form onSubmit={handleShare} className="space-y-2.5">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter registered username..."
+                    className="input text-xs flex-1"
+                    value={shareForm.username}
+                    onChange={(e) => setShareForm((f) => ({ ...f, username: e.target.value }))}
+                  />
                   <select
-                    className="input w-48 text-sm"
-                    value={editForm.category}
-                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                    className="input w-32 text-xs"
+                    value={shareForm.permission}
+                    onChange={(e) => setShareForm((f) => ({ ...f, permission: e.target.value }))}
                   >
-                    <option value="">None</option>
-                    {['contract', 'report', 'invoice', 'presentation', 'other'].map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    <option value="read">Can View</option>
+                    <option value="edit">Can Edit</option>
                   </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={sharing || !shareForm.username.trim()}
+                  className="btn-primary w-full text-xs py-2"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>{sharing ? 'Granting Access...' : 'Grant Access'}</span>
+                </button>
+              </form>
+
+              {/* Permissions List */}
+              <div className="pt-2">
+                {perms.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-zinc-950 border border-dashed border-zinc-800 text-center text-xs text-zinc-400">
+                    This document is private. Only you have access.
+                  </div>
                 ) : (
-                  <div>
-                    {doc.category ? (
-                      <span className="badge-blue capitalize text-xs px-3 py-1 font-medium">{doc.category}</span>
-                    ) : (
-                      <span className="text-slate-400 text-sm italic">Uncategorized</span>
-                    )}
+                  <div className="divide-y divide-zinc-850 rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950">
+                    {perms.map((p) => (
+                      <div
+                        key={p.id}
+                        className="p-3 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-zinc-200">
+                              @{p.username}
+                            </span>
+                            <span className={`badge text-[10px] capitalize font-medium ${
+                              p.permission === 'read' ? 'badge-blue' : 'badge-yellow'
+                            }`}>
+                              {p.permission === 'read' ? 'Can View' : 'Can Edit'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
+                            {p.email} · {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRevoke(p.id, p.username)}
+                          className="px-2 py-1 rounded bg-zinc-900 border border-rose-900/60 text-rose-400 hover:bg-rose-950/40 text-xs transition-colors"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Access Control & Collaborators */}
-          {isOwner ? (
-            <div className="card space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                    <Share2 className="w-4 h-4 text-accent" /> Access Control & Sharing
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Manage who can inspect or modify this secure asset</p>
-                </div>
-                <span className="badge-gray text-[11px] font-mono">
-                  {perms.length} {perms.length === 1 ? 'collaborator' : 'collaborators'}
-                </span>
-              </div>
-
-              {/* Share form */}
-              <form onSubmit={handleShare} className="flex gap-2">
-                <div className="relative flex-1">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    className="input pl-10 text-sm"
-                    placeholder="Enter collaborator username (e.g. bob, alice)..."
-                    value={shareForm.username}
-                    onChange={e => setShareForm(f => ({ ...f, username: e.target.value }))}
-                    required
-                  />
-                </div>
-                <select
-                  className="input w-28 text-sm"
-                  value={shareForm.permission}
-                  onChange={e => setShareForm(f => ({ ...f, permission: e.target.value }))}
-                >
-                  <option value="read">Read Only</option>
-                  <option value="edit">Can Edit</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={sharing || !shareForm.username.trim()}
-                  className="btn-primary text-xs whitespace-nowrap px-4"
-                >
-                  {sharing ? 'Granting...' : 'Grant Access'}
-                </button>
-              </form>
-
-              {/* Collaborators list */}
-              {perms.length === 0 ? (
-                <div className="text-center py-8 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
-                  <Lock className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
-                  <p className="text-sm font-medium text-slate-600">Strictly Private</p>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto mt-0.5">
-                    Only you have access to this document. Share with a username above to collaborate.
-                  </p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100 overflow-hidden">
-                  {perms.map(p => (
-                    <li key={p.id} className="flex items-center gap-3 p-3.5 bg-white hover:bg-slate-50/70 transition-colors">
-                      <div className="w-9 h-9 rounded-full bg-accent/15 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-xs">
-                        {p.username[0].toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-800">{p.username}</p>
-                          <span className={`badge text-[10px] ${p.permission === 'edit' ? 'badge-yellow' : 'badge-gray'}`}>
-                            {p.permission.toUpperCase()}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 font-mono truncate">{p.email}</p>
-                      </div>
-
-                      <select
-                        className="input w-28 text-xs py-1.5 px-2.5 h-8"
-                        value={p.permission}
-                        onChange={async e => {
-                          try {
-                            const r = await permissionsApi.update(doc.id, p.id, { permission: e.target.value })
-                            setPerms(ps => ps.map(x => x.id === p.id ? r.data : x))
-                            toast.success(`Updated ${p.username}'s permission to ${e.target.value}`)
-                          } catch { toast.error('Permission update failed') }
-                        }}
-                      >
-                        <option value="read">Read Only</option>
-                        <option value="edit">Can Edit</option>
-                      </select>
-
-                      <button
-                        onClick={() => handleRevoke(p.id, p.username)}
-                        className="btn-ghost p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Revoke Access"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* Security Caveat Disclaimer */}
-              <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/70 flex items-start gap-3">
-                <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div className="text-xs text-amber-900 leading-relaxed">
-                  <span className="font-semibold">Security Protocol:</span> Revoking access terminates authorization immediately on all subsequent API requests. In accordance with zero-trust principles, previously downloaded local copies cannot be wiped remotely.
-                </div>
-              </div>
-            </div>
           ) : (
-            <div className="card space-y-3">
-              <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-accent" /> Shared Access Protocol
-              </h2>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                This document is owned by <span className="font-semibold text-slate-700">{doc.owner_username}</span> and shared with you under <span className="font-semibold text-slate-700">{(doc.my_permission || 'read').toUpperCase()}</span> permissions. All reads and downloads are verified against current database ACLs and recorded in the audit trail.
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-3 text-xs shadow-card">
+              <div className="flex items-center gap-2 text-indigo-400">
+                <Lock className="w-4 h-4" />
+                <h3 className="text-xs font-bold uppercase text-zinc-200">
+                  Shared Access Active
+                </h3>
+              </div>
+              <p className="text-zinc-400 leading-relaxed">
+                This document is owned by <span className="text-zinc-200 font-semibold">@{doc.owner_username}</span> and shared with your account with <span className="text-indigo-300 font-semibold uppercase">{doc.my_permission}</span> privileges.
               </p>
             </div>
           )}
-        </div>
 
-        {/* Sidebar Information Column */}
-        <div className="space-y-6">
-          {/* Cryptographic Security Envelope */}
-          <div className="card border-accent/20 bg-gradient-to-b from-white to-navy-50/30 space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" /> Vault Security Status
-              </h3>
-              <div className="flex items-center gap-1.5">
-                <span className="live-dot"><span className="live-dot-ping"></span><span className="live-dot-core"></span></span>
-                <span className="text-[11px] font-semibold text-emerald-700">Protected</span>
+          {/* Security & Instant UUID Copy Box */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-3 shadow-card">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-zinc-200">Security Verified</span>
               </div>
+              <span className="badge-green text-[10px]">Protected</span>
             </div>
-
-            <div className="space-y-2.5 text-xs text-slate-600">
-              <div className="flex justify-between items-center py-1 border-b border-slate-100/60">
-                <span className="text-slate-400">At-Rest Storage</span>
-                <span className="font-mono text-slate-700 font-medium">Private Filesystem</span>
+            <div className="space-y-2 text-xs text-zinc-400">
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                <span>Encryption</span>
+                <span className="text-zinc-200">Private Server Vault</span>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100/60">
-                <span className="text-slate-400">Authorization</span>
-                <span className="badge-blue text-[10px] font-semibold">Strict ACL Checked</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100/60">
-                <span className="text-slate-400">Audit Status</span>
-                <span className="badge-green text-[10px] font-semibold">SHA-256 Chained</span>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/80">
+                <span>Audit Status</span>
+                <span className="text-emerald-400">Logged & Chained</span>
               </div>
               <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">File ID</span>
+                <span>Document ID</span>
                 <button
                   onClick={copyDocId}
-                  className="font-mono text-[11px] text-slate-700 hover:text-accent font-medium truncate max-w-[130px]"
-                  title="Click to copy ID"
+                  className="font-mono text-[11px] text-zinc-300 hover:text-white inline-flex items-center gap-1 underline"
                 >
-                  {doc.id}
+                  <span>{doc.id.slice(0, 8)}…</span>
+                  {copiedId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Technical Metadata */}
-          <div className="card space-y-3">
-            <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-wider">File Specifications</h3>
-            <div className="space-y-3 text-xs">
-              <div className="flex items-start gap-2.5">
-                <User className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-slate-400 font-medium">Document Owner</p>
-                  <p className="text-slate-700 font-semibold">{doc.owner_username ?? 'System'}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <HardDrive className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-slate-400 font-medium">Physical File Size</p>
-                  <p className="text-slate-700 font-semibold font-mono">{formatBytes(doc.file_size)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <Calendar className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-slate-400 font-medium">Uploaded Date</p>
-                  <p className="text-slate-700 font-semibold">{format(new Date(doc.created_at), 'PPpp')}</p>
-                  <p className="text-[11px] text-slate-400 font-normal">
-                    ({formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })})
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <Clock className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-slate-400 font-medium">Last Modified</p>
-                  <p className="text-slate-700 font-semibold">{format(new Date(doc.updated_at), 'PPpp')}</p>
-                </div>
               </div>
             </div>
           </div>

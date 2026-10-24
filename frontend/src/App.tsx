@@ -42,15 +42,18 @@ export default function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 4000,
+          duration: 3500,
           style: {
-            background: '#1e293b',
-            color: '#f8fafc',
-            borderRadius: '10px',
-            fontSize: '14px',
+            background: '#18181b',
+            color: '#f4f4f5',
+            border: '1px solid #27272a',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontFamily: '"JetBrains Mono", monospace',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
           },
-          success: { iconTheme: { primary: '#10b981', secondary: '#f8fafc' } },
-          error:   { iconTheme: { primary: '#ef4444', secondary: '#f8fafc' } },
+          success: { iconTheme: { primary: '#34d399', secondary: '#18181b' } },
+          error:   { iconTheme: { primary: '#f87171', secondary: '#18181b' } },
         }}
       />
       <Routes>

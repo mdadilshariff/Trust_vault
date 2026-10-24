@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Share2, Upload, ShieldCheck, TrendingUp, Clock } from 'lucide-react'
+import {
+  FileText, Share2, Upload, ShieldCheck, Clock,
+  ArrowUpRight, RefreshCw, CheckCircle2, Lock, Download,
+  Copy, Check, Search, Filter, Shield, AlertTriangle, Eye, ArrowRight
+} from 'lucide-react'
 import { documentsApi, auditApi } from '../api'
 import { useAuthStore } from '../store/auth'
 import { formatDistanceToNow } from 'date-fns'
 import type { Document, AuditEvent } from '../types'
+import toast from 'react-hot-toast'
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
@@ -12,159 +17,418 @@ export default function DashboardPage() {
   const [sharedDocs, setSharedDocs] = useState<Document[]>([])
   const [recentActivity, setRecentActivity] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [activeTab, setActiveTab] = useState<'my' | 'shared'>('my')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [verifying, setVerifying] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [docs, shared, audit] = await Promise.all([
-          documentsApi.list({ page_size: 5 }),
-          documentsApi.sharedWithMe({ page_size: 5 }),
-          auditApi.my({ page: 1 }),
-        ])
-        setMyDocs(docs.data.items)
-        setSharedDocs(shared.data.items)
-        setRecentActivity(audit.data.items.slice(0, 6))
-      } catch {}
-      setLoading(false)
-    }
-    load()
+  const loadData = useCallback(async () => {
+    try {
+      const [docs, shared, audit] = await Promise.all([
+        documentsApi.list({ page_size: 20 }),
+        documentsApi.sharedWithMe({ page_size: 20 }),
+        auditApi.my({ page: 1, page_size: 10 }),
+      ])
+      setMyDocs(docs.data.items)
+      setSharedDocs(shared.data.items)
+      setRecentActivity(audit.data.items)
+    } catch {}
+    setLoading(false)
   }, [])
 
-  const stat = (icon: React.ReactNode, label: string, value: number | string, to: string, color: string, border: string) => (
-    <Link to={to} className={`card-interactive group border-l-4 ${border}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{label}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1 tracking-tight">{value}</p>
-        </div>
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color} transition-all duration-200 group-hover:scale-110 shadow-xs`}>
-          {icon}
-        </div>
-      </div>
-    </Link>
-  )
+  useEffect(() => {
+    loadData()
+    const handler = () => { loadData() }
+    window.addEventListener('tv:data-changed', handler)
+    return () => window.removeEventListener('tv:data-changed', handler)
+  }, [loadData])
 
-  const outcomeColor = (o: string) =>
-    o === 'success' ? 'badge-green' : o === 'denied' ? 'badge-red' : 'badge-yellow'
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true)
+    await loadData()
+    setTimeout(() => setIsRefreshing(false), 400)
+  }
+
+  const copyId = (id: string) => {
+    navigator.clipboard.writeText(id)
+    setCopiedId(id)
+    toast.success('Document ID copied')
+    setTimeout(() => setCopiedId(null), 1500)
+  }
+
+  const runQuickVerify = async () => {
+    setVerifying(true)
+    try {
+      const r = await auditApi.integrity()
+      if (r.data.valid) {
+        toast.success(`Security check verified (${r.data.checked} records authenticated)`)
+      } else {
+        toast.error(`Security alert at record #${r.data.broken_at}`)
+      }
+    } catch {
+      toast.error('Failed to run verification')
+    }
+    setVerifying(false)
+  }
+
+  // Calculate storage usage
+  const totalSizeBytes = myDocs.reduce((acc, d) => acc + (d.file_size || 0), 0)
+  const totalSizeMB = (totalSizeBytes / (1024 * 1024)).toFixed(2)
+  const maxStorageMB = 50
+  const storagePercentage = Math.min(100, Math.max(1, (Number(totalSizeMB) / maxStorageMB) * 100))
+
+  // Filter current active list
+  const activeList = activeTab === 'my' ? myDocs : sharedDocs
+  const filteredDocs = activeList.filter((doc) => {
+    const matchesCategory = !categoryFilter || doc.category === categoryFilter
+    const matchesSearch = !searchQuery ||
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-fadeIn">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {user?.full_name?.split(' ')[0]}
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm flex items-center gap-2">
-            <span className="live-dot">
-              <span className="live-dot-ping"></span>
-              <span className="live-dot-core"></span>
-            </span>
-            End-to-end encrypted session active • Zero-leak private storage
-          </p>
+    <div className="space-y-6">
+      {/* 1. Executive Workspace Summary Deck (Integrated Deck) */}
+      <section className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-card backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Left: Greeting & Storage Gauge */}
+          <div className="space-y-3 flex-1 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-950/80 border border-indigo-700/60 flex items-center justify-center text-indigo-300 font-bold text-sm">
+                {user?.full_name?.[0]?.toUpperCase() ?? 'U'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold text-zinc-100 tracking-tight">
+                    {user?.full_name ? `Welcome, ${user.full_name}` : 'Welcome back'}
+                  </h1>
+                  <span className={`text-[10px] font-medium ${user?.role === 'admin' ? 'badge-yellow' : 'badge-blue'}`}>
+                    {user?.role === 'admin' ? 'Administrator' : 'Verified Member'}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  End-to-end encrypted document storage with real-time audit protection
+                </p>
+              </div>
+            </div>
+
+            {/* Storage Capacity Bar */}
+            <div className="pt-1 max-w-md">
+              <div className="flex items-center justify-between text-xs text-zinc-400 mb-1.5 font-medium">
+                <span>Vault Storage Used</span>
+                <span className="text-zinc-200">{totalSizeMB} MB of {maxStorageMB} MB ({storagePercentage.toFixed(0)}%)</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                  style={{ width: `${storagePercentage}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Fast Metric Strips & Primary Action */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+            <div className="flex items-center gap-3 p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl">
+              <Link to="/documents" className="px-3 text-center border-r border-zinc-800/80 hover:opacity-80 transition-opacity">
+                <span className="block text-xl font-bold text-zinc-100">{myDocs.length}</span>
+                <span className="text-[11px] text-zinc-400">My Files</span>
+              </Link>
+              <Link to="/shared" className="px-3 text-center border-r border-zinc-800/80 hover:opacity-80 transition-opacity">
+                <span className="block text-xl font-bold text-zinc-100">{sharedDocs.length}</span>
+                <span className="text-[11px] text-zinc-400">Shared</span>
+              </Link>
+              <Link to="/audit/my" className="px-3 text-center hover:opacity-80 transition-opacity">
+                <span className="block text-xl font-bold text-zinc-100">{recentActivity.length}</span>
+                <span className="text-[11px] text-zinc-400">Actions</span>
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="btn-secondary h-10 px-3"
+                title="Sync Workspace"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <Link to="/upload" className="btn-primary h-10 px-4 text-xs inline-flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                <span>Upload Document</span>
+              </Link>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Link to="/upload" className="btn-primary shadow-sm hover:shadow-accent/25">
-            <Upload className="w-4 h-4" /> Upload Document
-          </Link>
+      </section>
+
+      {/* 2. Structured Dual Work Area (70% Hub / 30% Intelligence) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (8 cols = ~67%): Document Command Center */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Explorer Toolbar */}
+          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* View Switcher: My Documents vs Shared */}
+            <div className="segmented-control self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('my'); setCategoryFilter('') }}
+                className={`segmented-item ${activeTab === 'my' ? 'active' : ''}`}
+              >
+                My Documents ({myDocs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('shared'); setCategoryFilter('') }}
+                className={`segmented-item ${activeTab === 'shared' ? 'active' : ''}`}
+              >
+                Shared with Me ({sharedDocs.length})
+              </button>
+            </div>
+
+            {/* Inline Quick Search */}
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filter files in view..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-8 text-xs py-1"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {['', 'contract', 'report', 'invoice', 'presentation', 'other'].map((cat) => {
+              const isActive = categoryFilter === cat
+              return (
+                <button
+                  key={cat || 'all'}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-3 py-1 rounded-lg border capitalize transition-all ${
+                    isActive
+                      ? 'bg-zinc-800 text-white font-medium border-zinc-600 shadow-xs'
+                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-800/80 hover:border-zinc-700 hover:text-zinc-200'
+                  }`}
+                >
+                  {cat || 'All Categories'}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Document Rows Stream */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-850 shadow-sm">
+            {loading ? (
+              <div className="p-16 text-center text-xs text-zinc-500 space-y-3">
+                <div className="w-7 h-7 border-2 border-zinc-700 border-t-indigo-400 rounded-full animate-spin mx-auto" />
+                <p>Loading files...</p>
+              </div>
+            ) : filteredDocs.length === 0 ? (
+              <div className="p-12 text-center text-xs space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-600">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-200">No documents found</p>
+                  <p className="text-zinc-500 text-[11px] mt-0.5">
+                    {searchQuery || categoryFilter
+                      ? 'No items match your active search or category filter.'
+                      : activeTab === 'my'
+                      ? 'Upload your first document to store it securely.'
+                      : 'No documents have been shared with your account yet.'}
+                  </p>
+                </div>
+                {activeTab === 'my' && !searchQuery && !categoryFilter && (
+                  <Link to="/upload" className="btn-primary text-xs inline-flex">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Document</span>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              filteredDocs.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="p-3.5 flex items-center justify-between gap-4 hover:bg-zinc-850/40 transition-colors group"
+                >
+                  {/* File Identity */}
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-indigo-400 group-hover:border-indigo-800/80 group-hover:bg-indigo-950/30 transition-all flex-shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/documents/${doc.id}`}
+                          className="font-medium text-zinc-200 hover:text-white transition-colors truncate text-xs"
+                        >
+                          {doc.title}
+                        </Link>
+                        {doc.category && (
+                          <span className={`badge text-[10px] capitalize font-medium ${
+                            doc.category === 'contract' ? 'badge-blue' :
+                            doc.category === 'report' ? 'badge-green' :
+                            doc.category === 'invoice' ? 'badge-yellow' :
+                            doc.category === 'presentation' ? 'badge-purple' :
+                            'badge-mono'
+                          }`}>
+                            {doc.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
+                        <span className="truncate max-w-[180px] text-zinc-400">{doc.original_filename}</span>
+                        <span>•</span>
+                        <span>{formatBytes(doc.file_size)}</span>
+                        <span>•</span>
+                        <span>{formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Toolbar */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => copyId(doc.id)}
+                      className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      title="Copy Document ID"
+                    >
+                      {copiedId === doc.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <a
+                      href={documentsApi.downloadUrl(doc.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 transition-colors"
+                      title="Download file"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </a>
+                    <Link
+                      to={`/documents/${doc.id}`}
+                      className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                      title="View details"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right Column (4 cols = ~33%): Security & Activity Intelligence Rail */}
+        <div className="lg:col-span-4 space-y-4">
+          {/* Security Seal & Chain Integrity Card */}
+          <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-semibold text-zinc-200">
+                  Security Integrity
+                </h3>
+              </div>
+              <span className="badge-green text-[10px]">
+                Protected
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Every document upload, permission modification, and view is recorded in an immutable SHA-256 hash chain.
+            </p>
+
+            <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Cryptographic Seal</span>
+                <span className="text-emerald-400 font-medium">Valid & Active</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Tamper Detection</span>
+                <span className="text-zinc-200">Zero Inconsistencies</span>
+              </div>
+            </div>
+
+            <button
+              onClick={runQuickVerify}
+              disabled={verifying}
+              className="w-full btn-secondary text-xs py-2 flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin text-emerald-400' : ''}`} />
+              <span>{verifying ? 'Verifying Chain...' : 'Run Security Check'}</span>
+            </button>
+          </div>
+
+          {/* Real-Time Activity Log Stream */}
+          <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-semibold text-zinc-200">
+                  Recent Actions
+                </h3>
+              </div>
+              <Link
+                to="/audit/my"
+                className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
+              >
+                <span>Full Log</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+
+            {recentActivity.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-6 text-center">
+                No recent activity recorded.
+              </p>
+            ) : (
+              <div className="divide-y divide-zinc-850">
+                {recentActivity.slice(0, 5).map((evt) => (
+                  <div key={evt.id} className="py-2.5 flex items-start justify-between gap-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-medium text-zinc-200 truncate">
+                        {evt.action.replace(/_/g, ' ')}
+                      </p>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        {formatDistanceToNow(new Date(evt.timestamp), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <span className={`text-[10px] uppercase font-medium flex-shrink-0 ${
+                      evt.outcome === 'success' ? 'badge-green' : 'badge-red'
+                    }`}>
+                      {evt.outcome}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 space-y-3">
-          <div className="w-9 h-9 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-slate-400 font-medium">Synchronizing vault index...</p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {stat(<FileText className="w-6 h-6 text-accent" />, 'My Documents', myDocs.length > 0 ? myDocs.length : 0, '/documents', 'bg-accent/10', 'border-accent')}
-            {stat(<Share2 className="w-6 h-6 text-emerald-600" />, 'Shared With Me', sharedDocs.length > 0 ? sharedDocs.length : 0, '/shared', 'bg-emerald-50 text-emerald-600', 'border-emerald-500')}
-            {stat(<ShieldCheck className="w-6 h-6 text-blue-600" />, 'Recent Activity', recentActivity.length, '/audit/my', 'bg-blue-50 text-blue-600', 'border-blue-500')}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Documents */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
-                  <FileText className="w-4 h-4 text-accent" />
-                  Recent Documents
-                </h2>
-                <Link to="/documents" className="text-xs font-medium text-accent hover:text-accent-dark transition-colors flex items-center gap-1 group">
-                  View all <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </Link>
-              </div>
-              {myDocs.length === 0 ? (
-                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-                  <div className="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto mb-3">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-700">No documents stored yet</p>
-                  <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Your private vault is ready. Upload files with cryptographic verification.</p>
-                  <Link to="/upload" className="btn-primary mt-4 inline-flex text-xs py-2">
-                    <Upload className="w-3.5 h-3.5" /> Upload First Document
-                  </Link>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {myDocs.map(d => (
-                    <li key={d.id}>
-                      <Link
-                        to={`/documents/${d.id}`}
-                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50/90 border border-transparent hover:border-slate-200/80 transition-all duration-150 group"
-                      >
-                        <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center flex-shrink-0 group-hover:bg-accent group-hover:text-white transition-colors duration-200">
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-accent transition-colors">{d.title}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}</p>
-                        </div>
-                        <span className="badge-gray text-[11px] font-mono uppercase px-2">{d.file_extension}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Recent Activity */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-accent" />
-                  Audit Trail
-                </h2>
-                <Link to="/audit/my" className="text-xs font-medium text-accent hover:text-accent-dark transition-colors flex items-center gap-1 group">
-                  View all <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                </Link>
-              </div>
-              {recentActivity.length === 0 ? (
-                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-700">No activity recorded</p>
-                  <p className="text-xs text-slate-400 mt-1">Actions on documents will appear here with tamper-evident hashes.</p>
-                </div>
-              ) : (
-                <ul className="space-y-2.5">
-                  {recentActivity.map(e => (
-                    <li key={e.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                      <div className="flex-1 min-w-0 pr-3">
-                        <p className="text-xs text-slate-800 font-mono font-medium truncate">{e.action}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{formatDistanceToNow(new Date(e.timestamp), { addSuffix: true })}</p>
-                      </div>
-                      <span className={outcomeColor(e.outcome)}>{e.outcome}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

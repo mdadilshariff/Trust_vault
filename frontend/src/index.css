@@ -3,115 +3,222 @@
 @tailwind utilities;
 
 @layer base {
-  * { box-sizing: border-box; }
-  body {
-    @apply font-sans bg-slate-50 text-slate-800 antialiased;
+  * {
+    box-sizing: border-box;
   }
+  
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-sans antialiased min-h-screen text-[13px] leading-relaxed;
+    background-color: #1E201E;
+    color: #ECDFCC;
+  }
+
+  ::selection {
+    background-color: rgba(105, 117, 101, 0.45);
+    color: #ECDFCC;
+  }
+
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent;
+    outline: 2px solid rgba(105, 117, 101, 0.7);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
+  /* Refined Earth Luxury Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-           transition-all duration-200 ease-out focus-visible:outline focus-visible:outline-2
-           focus-visible:outline-offset-2 active:translate-y-[1px] active:scale-[0.985]
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-md font-medium text-xs
+           transition-all duration-150 ease-out focus-visible:outline-none select-none active:scale-[0.98]
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none;
   }
+
+  /* Primary Button: Sage (#697565) with Warm Cream Text (#ECDFCC) */
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-dark
-           shadow-sm hover:shadow-md hover:shadow-accent/20;
+    @apply btn font-medium shadow-xs;
+    background-color: #697565;
+    color: #ECDFCC;
+    border: 1px solid rgba(139, 153, 134, 0.4);
   }
+  .btn-primary:hover {
+    background-color: #7A8875;
+  }
+
+  /* Secondary Button: Warm Slate (#3C3D37) with Cream Text (#ECDFCC) */
   .btn-secondary {
-    @apply btn bg-white text-slate-700 border border-slate-200
-           hover:bg-slate-50 hover:border-slate-300 shadow-card hover:shadow-card-md;
+    @apply btn shadow-xs;
+    background-color: #3C3D37;
+    color: #ECDFCC;
+    border: 1px solid #4D4F46;
   }
+  .btn-secondary:hover {
+    background-color: #474841;
+    color: #FFFFFF;
+    border-color: #697565;
+  }
+
+  /* Danger Button */
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 shadow-sm hover:shadow-md hover:shadow-red-500/20;
+    @apply btn shadow-xs;
+    background-color: rgba(60, 30, 30, 0.6);
+    color: #E29D9D;
+    border: 1px solid rgba(120, 50, 50, 0.6);
   }
+  .btn-danger:hover {
+    background-color: rgba(80, 40, 40, 0.8);
+    border-color: #E29D9D;
+    color: #FFFFFF;
+  }
+
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    @apply btn border border-transparent;
+    color: #A4A89D;
+  }
+  .btn-ghost:hover {
+    color: #ECDFCC;
+    background-color: #252724;
   }
 
-  .card {
-    @apply bg-white rounded-xl shadow-card border border-slate-100 p-6;
-  }
-  .card-sm {
-    @apply bg-white rounded-lg shadow-card border border-slate-100 p-4;
-  }
-  .card-interactive {
-    @apply card transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-card-md hover:border-slate-200;
+  /* Modern Work Panels (Elevated #3C3D37 with #1E201E Canvas) */
+  .panel {
+    @apply rounded-xl shadow-card backdrop-blur-sm;
+    background-color: rgba(37, 39, 36, 0.95);
+    border: 1px solid #3C3D37;
+    color: #ECDFCC;
   }
 
+  .panel-subtle {
+    @apply rounded-xl p-4;
+    background-color: rgba(30, 32, 30, 0.75);
+    border: 1px solid rgba(60, 61, 55, 0.8);
+    color: #ECDFCC;
+  }
+
+  .panel-interactive {
+    @apply panel transition-all duration-150 cursor-pointer;
+  }
+  .panel-interactive:hover {
+    border-color: #697565;
+    background-color: #2D302A;
+  }
+
+  /* Precision Inputs with Warm Earth Framing */
   .input {
-    @apply w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-800
-           placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-accent/25
-           focus:border-accent transition-all duration-150 shadow-xs;
+    @apply w-full px-3 py-1.5 rounded-lg text-xs font-sans transition-all shadow-xs;
+    background-color: #1E201E;
+    border: 1px solid #3C3D37;
+    color: #ECDFCC;
   }
+  .input::placeholder {
+    color: #7E8276;
+  }
+  .input:focus {
+    outline: none;
+    border-color: #697565;
+    box-shadow: 0 0 0 2px rgba(105, 117, 101, 0.25);
+  }
+
   .input-error {
-    @apply border-red-400 focus:ring-red-400/25 focus:border-red-400;
+    border-color: #883333;
+    color: #E29D9D;
+  }
+  .input-error:focus {
+    box-shadow: 0 0 0 2px rgba(180, 60, 60, 0.25);
+    border-color: #AA4444;
   }
 
   .label {
-    @apply block text-sm font-medium text-slate-700 mb-1.5;
+    @apply block text-xs font-medium mb-1.5;
+    color: #ECDFCC;
   }
 
+  /* Semantic Badges */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors;
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-tight border transition-colors select-none;
   }
-  .badge-green  { @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200/60; }
-  .badge-blue   { @apply badge bg-blue-50 text-blue-700 border border-blue-200/60; }
-  .badge-yellow { @apply badge bg-amber-50 text-amber-700 border border-amber-200/60; }
-  .badge-red    { @apply badge bg-red-50 text-red-700 border border-red-200/60; }
-  .badge-gray   { @apply badge bg-slate-100 text-slate-600 border border-slate-200/60; }
 
+  .badge-mono    { @apply badge; background-color: #3C3D37; color: #ECDFCC; border-color: #4D4F46; }
+  .badge-gray    { @apply badge; background-color: rgba(60, 61, 55, 0.6); color: #A4A89D; border-color: #3C3D37; }
+  .badge-blue    { @apply badge; background-color: rgba(40, 48, 38, 0.8); color: #B0BBAE; border-color: #475044; }
+  .badge-indigo  { @apply badge; background-color: rgba(40, 48, 38, 0.8); color: #B0BBAE; border-color: #475044; }
+  .badge-emerald { @apply badge; background-color: rgba(35, 45, 33, 0.85); color: #ECDFCC; border-color: #556650; }
+  .badge-green   { @apply badge; background-color: rgba(35, 45, 33, 0.85); color: #ECDFCC; border-color: #556650; }
+  .badge-amber   { @apply badge; background-color: rgba(56, 51, 36, 0.8); color: #DFCA98; border-color: #534932; }
+  .badge-yellow  { @apply badge; background-color: rgba(56, 51, 36, 0.8); color: #DFCA98; border-color: #534932; }
+  .badge-rose    { @apply badge; background-color: rgba(56, 37, 37, 0.8); color: #E29D9D; border-color: #553535; }
+  .badge-red     { @apply badge; background-color: rgba(56, 37, 37, 0.8); color: #E29D9D; border-color: #553535; }
+
+  /* Segmented Navigation Control */
+  .segmented-control {
+    @apply inline-flex p-1 rounded-lg gap-1 select-none;
+    background-color: #1E201E;
+    border: 1px solid #3C3D37;
+  }
+
+  .segmented-item {
+    @apply px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 cursor-pointer;
+    color: #A4A89D;
+  }
+  .segmented-item:hover {
+    color: #ECDFCC;
+  }
+
+  .segmented-item.active {
+    background-color: #3C3D37;
+    color: #ECDFCC;
+    border: 1px solid rgba(77, 79, 70, 0.6);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  }
+
+  /* Modern Data Row */
+  .data-row {
+    @apply flex items-center justify-between py-3 px-4 rounded-lg transition-colors border border-transparent;
+  }
+  .data-row:hover {
+    background-color: rgba(60, 61, 55, 0.4);
+    border-color: #3C3D37;
+  }
+
+  /* Cryptographic Key Chip */
+  .mono-chip {
+    @apply font-mono text-[11px] px-2 py-0.5 rounded select-all;
+    background-color: #1E201E;
+    border: 1px solid #3C3D37;
+    color: #ECDFCC;
+  }
+
+  /* Pulse Status Dots (Using Sage Accent #697565) */
   .live-dot {
-    @apply relative flex h-2 w-2;
+    @apply relative flex h-2 w-2 items-center justify-center;
   }
   .live-dot-ping {
-    @apply animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75;
+    @apply animate-ping absolute inline-flex h-full w-full rounded-full opacity-60;
+    background-color: #8B9986;
   }
   .live-dot-core {
-    @apply relative inline-flex rounded-full h-2 w-2 bg-emerald-500;
-  }
-
-  .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-           text-navy-300 hover:bg-navy-900/80 hover:text-white transition-all duration-150;
-  }
-  .sidebar-link.active {
-    @apply bg-accent/20 text-accent-light font-semibold shadow-inner;
-  }
-
-  .table-header {
-    @apply text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5 px-4 bg-slate-50/75;
+    @apply relative inline-flex rounded-full h-1.5 w-1.5;
+    background-color: #697565;
   }
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { @apply bg-slate-200 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-slate-300; }
-
-/* Micro-animations */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* Elegant Earth Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
-
-.shimmer-loading {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+::-webkit-scrollbar-thumb {
+  background: #3C3D37;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #697565;
 }

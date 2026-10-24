@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#252724" />
+      <stop offset="100%" stop-color="#1E201E" />
+    </linearGradient>
+
+    <!-- Sage Accent Gradient -->
+    <linearGradient id="sageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7B8977" />
+      <stop offset="100%" stop-color="#697565" />
+    </linearGradient>
+
+    <!-- Subtle Drop Shadow -->
+    <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Base Rounded Container (#1E201E & #3C3D37) -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bgGrad)" stroke="#3C3D37" stroke-width="14" />
+
+  <!-- Inner Vault Ring (#3C3D37 & #697565) -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#3C3D37" stroke-width="6" stroke-dasharray="14 10" opacity="0.6" />
+
+  <!-- Shield Shape Framing -->
+  <path d="M256 96 L376 150 C376 270 256 368 256 368 C256 368 136 270 136 150 Z" 
+        fill="#262924" 
+        stroke="url(#sageGrad)" 
+        stroke-width="10" 
+        stroke-linejoin="round"
+        filter="url(#subtleShadow)" />
+
+  <!-- Lock Shackle (#ECDFCC) -->
+  <path d="M216 230 V194 C216 171.9 233.9 154 256 154 C278.1 154 296 171.9 296 194 V230" 
+        fill="none" 
+        stroke="#ECDFCC" 
+        stroke-width="16" 
+        stroke-linecap="round" />
+
+  <!-- Lock Body (Sage Green #697565) -->
+  <rect x="194" y="222" width="124" height="96" rx="20" fill="url(#sageGrad)" stroke="#3C3D37" stroke-width="6" />
+
+  <!-- Keyhole Accent (#ECDFCC) -->
+  <circle cx="256" cy="260" r="12" fill="#ECDFCC" />
+  <path d="M251 268 L249 288 C249 291.5 252.5 294 256 294 C259.5 294 263 291.5 263 288 L261 268 Z" fill="#ECDFCC" />
+
+  <!-- Cryptographic Pulse Node Accent (Bottom Center) -->
+  <circle cx="256" cy="428" r="8" fill="#697565" />
+  <circle cx="216" cy="428" r="4" fill="#3C3D37" />
+  <circle cx="296" cy="428" r="4" fill="#3C3D37" />
+</svg>

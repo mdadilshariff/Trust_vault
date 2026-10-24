@@ -35,7 +35,11 @@ export const documentsApi = {
 
   delete: (id: string) => api.delete(`/documents/${id}`),
 
-  downloadUrl: (id: string) => `/api/documents/${id}/download`,
+  downloadUrl: (id: string) => {
+    const raw = (import.meta as any).env?.VITE_API_URL as string | undefined
+    const base = raw ? `${raw.replace(/\/+$/, '')}/api` : '/api'
+    return `${base}/documents/${id}/download`
+  },
 }
 
 export const permissionsApi = {
