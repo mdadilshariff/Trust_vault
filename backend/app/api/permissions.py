@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,12 +57,23 @@ async def grant_permission(
 ):
     await require_document_owner(document_id, current_user, db)
 
-    target_res = await db.execute(select(User).where(User.username == body.username))
+    identifier = body.username.strip()
+    target_res = await db.execute(
+        select(User).where(
+            or_(
+                func.lower(User.username) == identifier.lower(),
+                func.lower(User.email) == identifier.lower(),
+            )
+        )
+    )
     target = target_res.scalar_one_or_none()
     if not target:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"User '{identifier}' not found. Please enter a valid registered username or email.",
+        )
     if target.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot share with yourself.")
+        raise HTTPException(status_code=400, detail="Cannot share document with yourself.")
 
     # Upsert: update if exists, create if not
     existing_res = await db.execute(

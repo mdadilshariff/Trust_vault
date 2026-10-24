@@ -9,6 +9,7 @@ import { documentsApi, permissionsApi } from '../api'
 import type { Document, Permission } from '../types'
 import { formatDistanceToNow, format } from 'date-fns'
 import { emitAppUpdate } from '../store/events'
+import { useAuthStore } from '../store/auth'
 import toast from 'react-hot-toast'
 
 function formatBytes(b: number) {
@@ -20,8 +21,10 @@ function formatBytes(b: number) {
 export default function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [doc, setDoc] = useState<Document | null>(null)
   const [perms, setPerms] = useState<Permission[]>([])
+  const [collaborators, setCollaborators] = useState<Array<{ id: string; username: string; email: string; full_name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ title: '', description: '', category: '' })
@@ -30,7 +33,7 @@ export default function DocumentDetailPage() {
   const [sharing, setSharing] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
 
-  const isOwner = doc?.my_permission === 'owner'
+  const isOwner = doc?.my_permission === 'owner' || user?.role === 'admin'
   const canEdit = isOwner || doc?.my_permission === 'edit'
 
   const load = async () => {
@@ -44,9 +47,14 @@ export default function DocumentDetailPage() {
         description: r.data.description || '',
         category: r.data.category || '',
       })
-      if (r.data.my_permission === 'owner') {
-        const p = await permissionsApi.list(id)
+      const isUserOwner = r.data.my_permission === 'owner' || user?.role === 'admin'
+      if (isUserOwner) {
+        const [p, colRes] = await Promise.all([
+          permissionsApi.list(id).catch(() => ({ data: [] })),
+          documentsApi.collaborators().catch(() => ({ data: [] })),
+        ])
         setPerms(p.data)
+        setCollaborators(colRes.data)
       }
     } catch (e: any) {
       if (e.response?.status === 403) navigate('/access-denied')
@@ -387,11 +395,19 @@ export default function DocumentDetailPage() {
                   <input
                     type="text"
                     required
-                    placeholder="Enter registered username..."
+                    list="available-collaborators-list"
+                    placeholder="Enter username or email address..."
                     className="input text-xs flex-1"
                     value={shareForm.username}
                     onChange={(e) => setShareForm((f) => ({ ...f, username: e.target.value }))}
                   />
+                  <datalist id="available-collaborators-list">
+                    {collaborators.map((c) => (
+                      <option key={c.id} value={c.username}>
+                        {c.full_name} ({c.email})
+                      </option>
+                    ))}
+                  </datalist>
                   <select
                     className="input w-32 text-xs"
                     value={shareForm.permission}
@@ -401,6 +417,25 @@ export default function DocumentDetailPage() {
                     <option value="edit">Can Edit</option>
                   </select>
                 </div>
+
+                {/* Quick Pick Team Members */}
+                {collaborators.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5 pb-1">
+                    <span className="text-[10px] text-zinc-500 font-medium">Quick pick:</span>
+                    {collaborators.slice(0, 5).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setShareForm((f) => ({ ...f, username: c.username }))}
+                        className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700/60 transition-colors cursor-pointer"
+                        title={`${c.full_name} (${c.email})`}
+                      >
+                        @{c.username}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={sharing || !shareForm.username.trim()}

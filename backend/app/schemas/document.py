@@ -59,7 +59,7 @@ class PermissionOut(BaseModel):
 
 
 class PermissionCreate(BaseModel):
-    username: str = Field(..., min_length=1, max_length=64)
+    username: str = Field(..., min_length=1, max_length=255)
     permission: str = Field(..., pattern=r"^(read|edit)$")
 
 

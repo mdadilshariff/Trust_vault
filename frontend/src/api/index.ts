@@ -17,8 +17,11 @@ export const authApi = {
 }
 
 export const documentsApi = {
-  list: (params?: { page?: number; page_size?: number; q?: string; category?: string }) =>
+  list: (params?: { page?: number; page_size?: number; q?: string; category?: string; scope?: 'all' | 'owned' | 'shared' }) =>
     api.get('/documents', { params }),
+
+  collaborators: () =>
+    api.get<Array<{ id: string; username: string; email: string; full_name: string }>>('/documents/collaborators/list'),
 
   sharedWithMe: (params?: { page?: number; page_size?: number; q?: string }) =>
     api.get('/documents/shared-with-me', { params }),

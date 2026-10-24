@@ -24,6 +24,7 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
+  const [scope, setScope] = useState<'all' | 'owned' | 'shared'>('all')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -35,13 +36,14 @@ export default function DocumentsPage() {
         page_size: 20,
         q: q || undefined,
         category: category || undefined,
+        scope,
       })
       setData(r.data)
     } catch {
       toast.error('Failed to load documents')
     }
     setLoading(false)
-  }, [page, q, category])
+  }, [page, q, category, scope])
 
   useEffect(() => {
     load()
@@ -111,6 +113,36 @@ export default function DocumentsPage() {
 
       {/* Unified Search & Category Control Toolbar */}
       <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3 shadow-xs">
+        {/* Scope Switcher: All Documents vs My Documents vs Shared with Me */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-zinc-800/80">
+          <div className="segmented-control">
+            <button
+              type="button"
+              onClick={() => { setScope('all'); setPage(1) }}
+              className={`segmented-item ${scope === 'all' ? 'active' : ''}`}
+            >
+              All Accessible Files
+            </button>
+            <button
+              type="button"
+              onClick={() => { setScope('owned'); setPage(1) }}
+              className={`segmented-item ${scope === 'owned' ? 'active' : ''}`}
+            >
+              My Files
+            </button>
+            <button
+              type="button"
+              onClick={() => { setScope('shared'); setPage(1) }}
+              className={`segmented-item ${scope === 'shared' ? 'active' : ''}`}
+            >
+              Shared with Me
+            </button>
+          </div>
+          <span className="text-[11px] text-zinc-400">
+            {scope === 'all' ? 'Showing all vault assets you can access' : scope === 'owned' ? 'Showing files created by you' : 'Showing files shared with your account'}
+          </span>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Field */}
           <div className="relative flex-1">
@@ -230,8 +262,16 @@ export default function DocumentsPage() {
                           >
                             {doc.title}
                           </Link>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
-                            <span className="truncate max-w-[200px]">{doc.original_filename}</span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-zinc-400">
+                            <span className="truncate max-w-[180px]">{doc.original_filename}</span>
+                            <span>•</span>
+                            {doc.my_permission === 'owner' ? (
+                              <span className="text-[10px] text-emerald-400 font-medium">Owned</span>
+                            ) : (
+                              <span className="badge-blue text-[10px]">
+                                Shared ({doc.my_permission || 'view'}) · @{doc.owner_username || 'member'}
+                              </span>
+                            )}
                             <span>•</span>
                             <button
                               onClick={() => copyId(doc.id)}
@@ -292,14 +332,16 @@ export default function DocumentsPage() {
                         >
                           <Download className="w-3.5 h-3.5" />
                         </a>
-                        <button
-                          onClick={() => handleDelete(doc)}
-                          disabled={deleting === doc.id}
-                          className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
-                          title="Delete file"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {doc.my_permission === 'owner' && (
+                          <button
+                            onClick={() => handleDelete(doc)}
+                            disabled={deleting === doc.id}
+                            className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

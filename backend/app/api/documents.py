@@ -18,7 +18,7 @@ from app.core.authorization import (
 from app.core.storage import validate_and_store, get_file_path, delete_stored_file
 from app.database import get_db
 from app.models.document import Document, DocumentPermission, PermissionLevel
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.document import DocumentOut, DocumentListOut, DocumentUpdate
 from app.services.audit_service import record_event
 
@@ -31,7 +31,15 @@ def _ip(request: Request) -> str | None:
 
 
 def _doc_out(doc: Document, user: User, perm: DocumentPermission | None = None) -> DocumentOut:
-    my_perm = "owner" if doc.owner_id == user.id else (perm.permission.value if perm else None)
+    if doc.owner_id == user.id:
+        my_perm = "owner"
+    elif perm:
+        my_perm = perm.permission.value
+    elif user.role == "admin" or getattr(user, "role", None) == UserRole.admin:
+        my_perm = "edit"
+    else:
+        my_perm = None
+
     return DocumentOut(
         id=doc.id, owner_id=doc.owner_id, title=doc.title,
         description=doc.description, category=doc.category,
@@ -84,6 +92,21 @@ async def upload_document(
     return _doc_out(doc, current_user)
 
 
+@router.get("/collaborators/list")
+async def list_available_collaborators(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(User.id, User.username, User.email, User.full_name)
+        .where(User.id != current_user.id, User.is_active == True)
+        .order_by(User.username.asc())
+        .limit(100)
+    )
+    rows = result.all()
+    return [{"id": str(r.id), "username": r.username, "email": r.email, "full_name": r.full_name} for r in rows]
+
+
 @router.get("", response_model=DocumentListOut)
 async def list_my_documents(
     request: Request,
@@ -91,10 +114,23 @@ async def list_my_documents(
     page_size: int = Query(20, ge=1, le=100),
     q: Optional[str] = Query(None, max_length=200),
     category: Optional[str] = Query(None, max_length=64),
+    scope: Optional[str] = Query("all", pattern=r"^(all|owned|shared)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    base = select(Document).options(selectinload(Document.owner)).where(Document.owner_id == current_user.id)
+    shared_subquery = select(DocumentPermission.document_id).where(DocumentPermission.user_id == current_user.id)
+
+    if scope == "owned":
+        filter_condition = (Document.owner_id == current_user.id)
+    elif scope == "shared":
+        filter_condition = Document.id.in_(shared_subquery)
+    else:  # "all"
+        filter_condition = or_(
+            Document.owner_id == current_user.id,
+            Document.id.in_(shared_subquery),
+        )
+
+    base = select(Document).options(selectinload(Document.owner)).where(filter_condition)
     if q:
         base = base.where(Document.title.ilike(f"%{q}%"))
     if category:
@@ -108,8 +144,22 @@ async def list_my_documents(
         .offset((page - 1) * page_size).limit(page_size)
     )
     docs = result.scalars().all()
+
+    # Pre-fetch permissions for current_user on these docs
+    doc_ids = [d.id for d in docs]
+    perms_map: dict[uuid.UUID, DocumentPermission] = {}
+    if doc_ids:
+        p_res = await db.execute(
+            select(DocumentPermission).where(
+                DocumentPermission.document_id.in_(doc_ids),
+                DocumentPermission.user_id == current_user.id,
+            )
+        )
+        for p in p_res.scalars().all():
+            perms_map[p.document_id] = p
+
     return DocumentListOut(
-        items=[_doc_out(d, current_user) for d in docs],
+        items=[_doc_out(d, current_user, perms_map.get(d.id)) for d in docs],
         total=total, page=page, page_size=page_size,
     )
 

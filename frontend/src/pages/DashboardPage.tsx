@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     try {
       const [docs, shared, audit] = await Promise.all([
-        documentsApi.list({ page_size: 20 }),
+        documentsApi.list({ page_size: 20, scope: 'owned' }),
         documentsApi.sharedWithMe({ page_size: 20 }),
         auditApi.my({ page: 1, page_size: 10 }),
       ])
