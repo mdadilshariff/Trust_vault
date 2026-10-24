@@ -92,6 +92,7 @@ export default function AppHeader({ onToggleActivity, isActivityOpen }: AppHeade
     try {
       await authApi.logout()
     } finally {
+      localStorage.removeItem('tv_token')
       setUser(null)
       navigate('/login')
     }

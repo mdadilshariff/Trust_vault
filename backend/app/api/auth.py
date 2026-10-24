@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization import get_current_user
-from app.core.security import hash_password, verify_password, needs_rehash
+from app.core.security import hash_password, verify_password, needs_rehash, create_session_token
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserLogin, UserOut, ChangePassword
@@ -48,7 +48,10 @@ async def register(body: UserCreate, request: Request, db: AsyncSession = Depend
                        resource_type="user", resource_id=str(user.id),
                        ip_address=_ip(request))
     await db.commit()
-    return user
+    request.session["user_id"] = str(user.id)
+    out = UserOut.model_validate(user)
+    out.access_token = create_session_token(str(user.id))
+    return out
 
 
 @router.post("/login", response_model=UserOut)
@@ -80,7 +83,9 @@ async def login(body: UserLogin, request: Request, db: AsyncSession = Depends(ge
                        actor_id=str(user.id), actor_email=user.email,
                        ip_address=_ip(request))
     await db.commit()
-    return user
+    out = UserOut.model_validate(user)
+    out.access_token = create_session_token(str(user.id))
+    return out
 
 
 @router.post("/logout")
@@ -96,7 +101,9 @@ async def logout(request: Request, db: AsyncSession = Depends(get_db),
 
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
-    return current_user
+    out = UserOut.model_validate(current_user)
+    out.access_token = create_session_token(str(current_user.id))
+    return out
 
 
 @router.post("/change-password")

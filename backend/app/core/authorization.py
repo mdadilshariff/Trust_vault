@@ -15,10 +15,40 @@ from app.models.document import Document, DocumentPermission, PermissionLevel
 from app.models.user import User, UserRole
 
 
+from app.core.security import verify_session_token
+
+
 # ── Session helpers ────────────────────────────────────────────────────────────
 
 def _get_session_user_id(request: Request) -> str | None:
-    return request.session.get("user_id")
+    # 1. Cookie session
+    user_id = request.session.get("user_id")
+    if user_id:
+        return user_id
+
+    # 2. Authorization header: Bearer <token>
+    auth = request.headers.get("Authorization")
+    if auth and auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        uid = verify_session_token(token)
+        if uid:
+            return uid
+
+    # 3. Custom token header: X-Session-Token
+    token_hdr = request.headers.get("X-Session-Token")
+    if token_hdr:
+        uid = verify_session_token(token_hdr)
+        if uid:
+            return uid
+
+    # 4. Query parameter token: ?token=... (for direct file downloads)
+    query_token = request.query_params.get("token")
+    if query_token:
+        uid = verify_session_token(query_token)
+        if uid:
+            return uid
+
+    return None
 
 
 async def get_current_user(

@@ -27,12 +27,23 @@ export default function App() {
   useEffect(() => {
     // Restore session on mount
     authApi.me()
-      .then(r => setUser(r.data))
-      .catch(() => setUser(null))
+      .then(r => {
+        if (r.data.access_token) {
+          localStorage.setItem('tv_token', r.data.access_token)
+        }
+        setUser(r.data)
+      })
+      .catch(() => {
+        localStorage.removeItem('tv_token')
+        setUser(null)
+      })
       .finally(() => setLoading(false))
 
     // Handle 401 events from axios interceptor
-    const handler = () => { setUser(null) }
+    const handler = () => {
+      localStorage.removeItem('tv_token')
+      setUser(null)
+    }
     window.addEventListener('tv:unauthorized', handler)
     return () => window.removeEventListener('tv:unauthorized', handler)
   }, [])

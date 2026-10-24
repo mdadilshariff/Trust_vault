@@ -38,7 +38,8 @@ export const documentsApi = {
   downloadUrl: (id: string) => {
     const raw = (import.meta as any).env?.VITE_API_URL as string | undefined
     const base = raw ? `${raw.replace(/\/+$/, '')}/api` : '/api'
-    return `${base}/documents/${id}/download`
+    const token = localStorage.getItem('tv_token')
+    return token ? `${base}/documents/${id}/download?token=${encodeURIComponent(token)}` : `${base}/documents/${id}/download`
   },
 }
 

@@ -9,11 +9,20 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('tv_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+    config.headers['X-Session-Token'] = token
+  }
+  return config
+})
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401) {
-      // Clear auth state — App will redirect to login
+      localStorage.removeItem('tv_token')
       window.dispatchEvent(new Event('tv:unauthorized'))
     }
     return Promise.reject(err)

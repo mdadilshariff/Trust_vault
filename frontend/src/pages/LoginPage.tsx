@@ -20,6 +20,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const r = await authApi.login(form)
+      if (r.data.access_token) {
+        localStorage.setItem('tv_token', r.data.access_token)
+      }
       setUser(r.data)
       emitAppUpdate({
         action: 'USER_LOGIN',

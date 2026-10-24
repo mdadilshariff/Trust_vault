@@ -42,6 +42,9 @@ export default function RegisterPage() {
       await authApi.register(form)
       // Auto-login after registration
       const login = await authApi.login({ email: form.email, password: form.password })
+      if (login.data.access_token) {
+        localStorage.setItem('tv_token', login.data.access_token)
+      }
       setUser(login.data)
       emitAppUpdate({
         action: 'USER_REGISTERED',

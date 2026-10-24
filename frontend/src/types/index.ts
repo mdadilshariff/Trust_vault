@@ -6,6 +6,7 @@ export interface User {
   role: 'admin' | 'user'
   is_active: boolean
   created_at: string
+  access_token?: string
 }
 
 export interface Document {
