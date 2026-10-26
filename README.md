@@ -24,9 +24,9 @@
 ![Tests](https://img.shields.io/badge/tests-18%20passed-22c55e?style=flat-square)
 ![Auth](https://img.shields.io/badge/auth-Argon2id-8b5cf6?style=flat-square)
 ![Audit](https://img.shields.io/badge/audit-SHA--256%20chain-f97316?style=flat-square)
-![Stars](https://img.shields.io/github/stars/mdadilshariff/trustvault?style=flat-square&logo=github&color=eab308)
-![Last Commit](https://img.shields.io/github/last-commit/mdadilshariff/trustvault?style=flat-square&logo=git&logoColor=white)
-![Repo Size](https://img.shields.io/github/repo-size/mdadilshariff/trustvault?style=flat-square)
+![Stars](https://img.shields.io/github/stars/mdadilshariff/Trust_vault?style=flat-square&logo=github&color=eab308)
+![Last Commit](https://img.shields.io/github/last-commit/mdadilshariff/Trust_vault?style=flat-square&logo=git&logoColor=white)
+![Repo Size](https://img.shields.io/github/repo-size/mdadilshariff/Trust_vault?style=flat-square)
 
 <br/>
 
